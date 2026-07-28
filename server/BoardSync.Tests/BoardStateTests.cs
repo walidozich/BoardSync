@@ -1,5 +1,7 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using BoardSync.Api.Features.Auth;
 using BoardSync.Api.Features.Board;
 using BoardSync.Tests.Infrastructure;
 
@@ -8,10 +10,24 @@ namespace BoardSync.Tests;
 [Collection(DatabaseCollection.Name)]
 public sealed class BoardStateTests(BoardSyncApiFactory factory)
 {
+    private static async Task<HttpClient> AuthenticatedClientAsync(BoardSyncApiFactory factory)
+    {
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/register",
+            new RegisterRequest($"user-{Guid.NewGuid():N}@example.com", "correcthorse123", "Alice")
+        );
+        var body = await response.Content.ReadFromJsonAsync<AuthResponse>();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.Token);
+        return client;
+    }
+
     [Fact]
     public async Task GetBoard_ReturnsColumnsInSeededOrderAndPosition()
     {
-        var client = factory.CreateClient();
+        var client = await AuthenticatedClientAsync(factory);
 
         var response = await client.GetAsync("/api/board");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -27,7 +43,7 @@ public sealed class BoardStateTests(BoardSyncApiFactory factory)
     [Fact]
     public async Task GetBoard_ReturnsCardsAssignedToCorrectColumnsWithExpectedCount()
     {
-        var client = factory.CreateClient();
+        var client = await AuthenticatedClientAsync(factory);
 
         var response = await client.GetAsync("/api/board");
         var board = await response.Content.ReadFromJsonAsync<BoardStateDto>();
@@ -52,7 +68,7 @@ public sealed class BoardStateTests(BoardSyncApiFactory factory)
     [Fact]
     public async Task GetBoard_EveryCardHasNonZeroVersion()
     {
-        var client = factory.CreateClient();
+        var client = await AuthenticatedClientAsync(factory);
 
         var response = await client.GetAsync("/api/board");
         var board = await response.Content.ReadFromJsonAsync<BoardStateDto>();

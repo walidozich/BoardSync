@@ -1,18 +1,10 @@
-import { useEffect, useState } from 'react';
-import { fetchBoard, type BoardDto } from '../api/board';
 import { useAuth } from '../auth/auth-context';
 import { Column } from './Column';
+import { useBoardConnection } from './useBoardConnection';
 
 export function BoardPage() {
-  const { token, displayName, logout } = useAuth();
-  const [board, setBoard] = useState<BoardDto | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchBoard(token)
-      .then(setBoard)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Unknown error'));
-  }, [token]);
+  const { displayName, logout } = useAuth();
+  const { board, status, error } = useBoardConnection();
 
   return (
     <main>
@@ -22,6 +14,8 @@ export function BoardPage() {
           Log out
         </button>
       </header>
+
+      <p>Connection: {status}</p>
 
       {error && <p>Could not load the board: {error}</p>}
       {!error && !board && <p>Loading...</p>}

@@ -1,11 +1,15 @@
+using System.Text;
 using System.Threading.RateLimiting;
 using BoardSync.Api.Data;
 using BoardSync.Api.Data.Entities;
 using BoardSync.Api.Features.Auth;
 using BoardSync.Api.Features.Board;
+using BoardSync.Api.Hubs;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,6 +62,61 @@ builder.Services.AddRateLimiter(options =>
     );
 });
 
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+
+            // Read from IConfiguration inside this same lambda rather than into a variable
+            // declared before AddJwtBearer is called: this configureOptions delegate is
+            // invoked lazily by the options pattern (at first resolution, not at
+            // AddJwtBearer() call time), which is what lets WebApplicationFactory-based
+            // integration tests see their config overrides — same discipline as the
+            // DbContext/CORS setup above.
+            ValidIssuer = builder.Configuration["Jwt:Issuer"]
+                ?? throw new InvalidOperationException("Configuration value 'Jwt:Issuer' is not set."),
+            ValidAudience = builder.Configuration["Jwt:Audience"]
+                ?? throw new InvalidOperationException("Configuration value 'Jwt:Audience' is not set."),
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(
+                    builder.Configuration["Jwt:Secret"]
+                        ?? throw new InvalidOperationException("Configuration value 'Jwt:Secret' is not set.")
+                )
+            ),
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+
+                // Restricted to the hub path on purpose: browsers can't set custom headers on
+                // a WebSocket handshake, forcing the token into the query string for that one
+                // connection — but query strings can land in proxy/server access logs, so this
+                // must never become a second, REST-usable way to authenticate.
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/board"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            },
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddSignalR();
+
 const string ClientCorsPolicy = "Client";
 builder.Services.AddCors(options =>
 {
@@ -67,7 +126,16 @@ builder.Services.AddCors(options =>
         {
             var origin = builder.Configuration["CorsOrigin"]
                 ?? throw new InvalidOperationException("Configuration value 'CorsOrigin' is not set.");
-            policy.WithOrigins(origin).AllowAnyHeader().AllowAnyMethod();
+
+            // AllowCredentials is required because @microsoft/signalr's negotiate request
+            // sends `credentials: 'include'` by default on a cross-origin connection (the
+            // dev split between :5173 and :5080). Per the CORS spec, a credentialed request
+            // requires the server to echo Access-Control-Allow-Credentials, or the browser
+            // discards the response outright — this surfaced only now because nothing
+            // before the SignalR hub sent a credentialed cross-origin request. Safe to pair
+            // with a specific WithOrigins() (unlike AllowAnyOrigin, which CORS forbids
+            // combining with credentials).
+            policy.WithOrigins(origin).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
         }
     );
 });
@@ -83,6 +151,9 @@ app.UseCors(ClientCorsPolicy);
 
 app.UseRateLimiter();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -94,6 +165,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 app.MapBoardEndpoints();
 app.MapAuthEndpoints();
+app.MapHub<BoardHub>("/hubs/board");
 
 app.Run();
 
