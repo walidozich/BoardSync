@@ -1,0 +1,50 @@
+# --- Project working files (solo mode) ---
+spec.md
+plan.md
+CLAUDE.md
+credentials.md
+.claude/
+
+# --- Secrets ---
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# --- .NET ---
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+TestResults/
+*.trx
+*.coverage
+coverage/
+.vs/
+*.swp
+
+# --- Node / client ---
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.tsbuildinfo
+.pnpm-store/
+npm-debug.log*
+pnpm-debug.log*
+
+# --- Playwright ---
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# --- Editors / OS ---
+.idea/
+.DS_Store
+Thumbs.db
+*~
