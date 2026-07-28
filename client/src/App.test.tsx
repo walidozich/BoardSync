@@ -32,6 +32,7 @@ describe('App protected route', () => {
       presence: [{ id: 'user-1', displayName: 'Carol' }],
       createCard: vi.fn(),
       createCardError: null,
+      moveCard: vi.fn(),
       board: {
         id: '1',
         name: 'BoardSync Demo',

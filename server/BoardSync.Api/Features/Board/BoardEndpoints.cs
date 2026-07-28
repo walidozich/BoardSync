@@ -14,6 +14,12 @@ public record CardCreatedDto(Guid Id, Guid ColumnId, string Title, string? Descr
 
 public record CreateCardRejectedDto(string Reason, IReadOnlyDictionary<string, string[]>? Errors);
 
+public record MoveCardRequest(Guid CardId, Guid TargetColumnId, Guid? AfterCardId, Guid? BeforeCardId, uint ExpectedVersion);
+
+public record CardMovedDto(Guid Id, Guid ColumnId, double Position, uint Version);
+
+public record MoveRejectedDto(string Reason, Guid CardId);
+
 public static class BoardEndpoints
 {
     public static void MapBoardEndpoints(this WebApplication app)

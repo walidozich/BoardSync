@@ -84,6 +84,52 @@ public sealed class BoardHub(AppDbContext db, PresenceTracker presence, CardServ
         }
     }
 
+    // Broadcasts to the whole group, including whoever dragged the card -- same reasoning as
+    // CreateCard: this phase's client applies the move optimistically on drop for instant
+    // feedback, then reconciles against this same broadcast when it arrives, exactly like
+    // everyone else. No special-casing for the mover.
+    public async Task MoveCard(MoveCardRequest request)
+    {
+        var result = await cardService.MoveAsync(
+            request.CardId,
+            request.TargetColumnId,
+            request.AfterCardId,
+            request.BeforeCardId,
+            request.ExpectedVersion
+        );
+
+        switch (result)
+        {
+            case MoveCardResult.Success success:
+                var boardId = await BoardQueries.GetBoardIdAsync(db);
+                if (boardId is null)
+                {
+                    break; // shouldn't happen -- the move itself required an existing board via FK
+                }
+
+                var dto = new CardMovedDto(
+                    success.Card.Id,
+                    success.Card.ColumnId,
+                    success.Card.Position,
+                    success.Card.Version
+                );
+                await Clients.Group(boardId.Value.ToString()).SendAsync("CardMoved", dto);
+                break;
+            case MoveCardResult.CardNotFound:
+                await Clients.Caller.SendAsync(
+                    "MoveRejected",
+                    new MoveRejectedDto(nameof(RejectReason.CardNotFound), request.CardId)
+                );
+                break;
+            case MoveCardResult.ColumnNotFound:
+                await Clients.Caller.SendAsync(
+                    "MoveRejected",
+                    new MoveRejectedDto(nameof(RejectReason.ColumnNotFound), request.CardId)
+                );
+                break;
+        }
+    }
+
     public override async Task OnConnectedAsync()
     {
         var isNewUser = presence.AddConnection(GetUserId(), GetDisplayName(), Context.ConnectionId);
