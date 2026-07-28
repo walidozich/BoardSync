@@ -27,7 +27,27 @@ describe('App protected route', () => {
       vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ id: '1', name: 'BoardSync Demo' }),
+        json: () =>
+          Promise.resolve({
+            id: '1',
+            name: 'BoardSync Demo',
+            columns: [
+              {
+                id: 'col-1',
+                name: 'To Do',
+                position: 0,
+                cards: [
+                  {
+                    id: 'card-1',
+                    title: 'First card',
+                    description: 'Details',
+                    position: 0,
+                    version: 1,
+                  },
+                ],
+              },
+            ],
+          }),
       }),
     );
 

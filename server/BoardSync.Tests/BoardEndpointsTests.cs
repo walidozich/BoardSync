@@ -18,10 +18,11 @@ public sealed class BoardEndpointsTests(BoardSyncApiFactory factory)
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var board = await response.Content.ReadFromJsonAsync<BoardDto>();
+        var board = await response.Content.ReadFromJsonAsync<BoardStateDto>();
 
         Assert.NotNull(board);
         Assert.NotEqual(Guid.Empty, board.Id);
         Assert.Equal(DbSeeder.DemoBoardName, board.Name);
+        Assert.NotEmpty(board.Columns);
     }
 }
