@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="BoardSync.Api/BoardSync.Api.csproj" />
+  <Project Path="BoardSync.Tests/BoardSync.Tests.csproj" />
+</Solution>
