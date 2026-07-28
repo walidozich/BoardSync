@@ -7,8 +7,14 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5080';
 
 export type BoardConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
+export interface PresenceUser {
+  id: string;
+  displayName: string;
+}
+
 export interface BoardConnectionState {
   board: BoardDto | null;
+  presence: PresenceUser[];
   status: BoardConnectionStatus;
   error: string | null;
 }
@@ -16,6 +22,7 @@ export interface BoardConnectionState {
 export function useBoardConnection(): BoardConnectionState {
   const { token } = useAuth();
   const [board, setBoard] = useState<BoardDto | null>(null);
+  const [presence, setPresence] = useState<PresenceUser[]>([]);
   const [status, setStatus] = useState<BoardConnectionStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
 
@@ -36,9 +43,16 @@ export function useBoardConnection(): BoardConnectionState {
       }
     });
 
+    connection.on('PresenceChanged', (roster: PresenceUser[]) => {
+      if (!cancelled) {
+        setPresence(roster);
+      }
+    });
+
     connection.onclose(() => {
       if (!cancelled) {
         setStatus('disconnected');
+        setPresence([]);
       }
     });
 
@@ -65,8 +79,8 @@ export function useBoardConnection(): BoardConnectionState {
   }, [token]);
 
   if (!token) {
-    return { board: null, status: 'disconnected', error: null };
+    return { board: null, presence: [], status: 'disconnected', error: null };
   }
 
-  return { board, status, error };
+  return { board, presence, status, error };
 }

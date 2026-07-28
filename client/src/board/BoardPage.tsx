@@ -1,10 +1,11 @@
 import { useAuth } from '../auth/auth-context';
 import { Column } from './Column';
+import { PresenceRoster } from './PresenceRoster';
 import { useBoardConnection } from './useBoardConnection';
 
 export function BoardPage() {
   const { displayName, logout } = useAuth();
-  const { board, status, error } = useBoardConnection();
+  const { board, presence, status, error } = useBoardConnection();
 
   return (
     <main>
@@ -16,6 +17,7 @@ export function BoardPage() {
       </header>
 
       <p>Connection: {status}</p>
+      <PresenceRoster users={presence} />
 
       {error && <p>Could not load the board: {error}</p>}
       {!error && !board && <p>Loading...</p>}

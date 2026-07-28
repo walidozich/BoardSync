@@ -29,6 +29,7 @@ describe('App protected route', () => {
     vi.spyOn(useBoardConnectionModule, 'useBoardConnection').mockReturnValue({
       status: 'connected',
       error: null,
+      presence: [{ id: 'user-1', displayName: 'Carol' }],
       board: {
         id: '1',
         name: 'BoardSync Demo',
@@ -58,5 +59,7 @@ describe('App protected route', () => {
     expect(screen.getByText('BoardSync Demo')).toBeInTheDocument();
     expect(screen.getByText('To Do')).toBeInTheDocument();
     expect(screen.getByText('First card')).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Currently connected' })).toBeInTheDocument();
+    expect(screen.getByText('Carol')).toBeInTheDocument();
   });
 });

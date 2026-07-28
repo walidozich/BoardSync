@@ -5,6 +5,7 @@ using BoardSync.Api.Data.Entities;
 using BoardSync.Api.Features.Auth;
 using BoardSync.Api.Features.Board;
 using BoardSync.Api.Hubs;
+using BoardSync.Api.Presence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
@@ -32,6 +33,11 @@ builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 // Stateless apart from reading IConfiguration on each IssueToken call, which keeps
 // test-supplied configuration overrides visible (see the DbContext note above).
 builder.Services.AddSingleton<JwtTokenService>();
+
+// In-process by design (see README's out-of-scope notes on the no-Redis-backplane
+// decision): presence would need shared state across instances the moment this app
+// scales beyond one.
+builder.Services.AddSingleton<PresenceTracker>();
 
 builder.Services.AddRateLimiter(options =>
 {
