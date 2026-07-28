@@ -34,6 +34,7 @@ describe('App protected route', () => {
       createCardError: null,
       moveCard: vi.fn(),
       staleVersionNotice: null,
+      deleteCard: vi.fn(),
       board: {
         id: '1',
         name: 'BoardSync Demo',

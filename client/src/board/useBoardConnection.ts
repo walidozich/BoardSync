@@ -54,6 +54,7 @@ export interface BoardConnectionState {
     beforeCardId: string | null,
   ) => void;
   staleVersionNotice: string | null;
+  deleteCard: (cardId: string) => void;
 }
 
 /**
@@ -162,6 +163,34 @@ export function applyMoveRejected(
   return board;
 }
 
+/**
+ * Immutably removes the card with the given id from whichever column
+ * currently contains it, from a `CardDeleted` event's payload (a bare card
+ * id). Pure so it can be unit tested without a real HubConnection, matching
+ * applyCardCreated/applyCardMoved. Returns the same `board` reference
+ * (no-op) if there's no board yet, or the card isn't found in any column.
+ */
+export function applyCardDeleted(board: BoardDto | null, cardId: string): BoardDto | null {
+  if (!board) {
+    return board;
+  }
+
+  const columnIndex = board.columns.findIndex((column) =>
+    column.cards.some((card) => card.id === cardId),
+  );
+  if (columnIndex === -1) {
+    return board;
+  }
+
+  const columns = board.columns.map((column, index) =>
+    index === columnIndex
+      ? { ...column, cards: column.cards.filter((card) => card.id !== cardId) }
+      : column,
+  );
+
+  return { ...board, columns };
+}
+
 export function useBoardConnection(): BoardConnectionState {
   const { token } = useAuth();
   const [board, setBoard] = useState<BoardDto | null>(null);
@@ -249,6 +278,12 @@ export function useBoardConnection(): BoardConnectionState {
       connection.invoke('JoinBoard').catch((err: unknown) => {
         console.error('JoinBoard invoke failed', err);
       });
+    });
+
+    connection.on('CardDeleted', (cardId: string) => {
+      if (!cancelled) {
+        setBoard((prev) => applyCardDeleted(prev, cardId));
+      }
     });
 
     connection.onclose(() => {
@@ -360,6 +395,31 @@ export function useBoardConnection(): BoardConnectionState {
       });
   }
 
+  function deleteCard(cardId: string): void {
+    const connection = connectionRef.current;
+    if (!connection) {
+      return;
+    }
+
+    let expectedVersion: number | null = null;
+    for (const column of board?.columns ?? []) {
+      for (const card of column.cards) {
+        if (card.id === cardId) {
+          expectedVersion = card.version;
+        }
+      }
+    }
+    if (expectedVersion === null) {
+      return;
+    }
+
+    setBoard((prev) => applyCardDeleted(prev, cardId));
+
+    connection.invoke('DeleteCard', { cardId, expectedVersion }).catch((err: unknown) => {
+      console.error('DeleteCard invoke failed', err);
+    });
+  }
+
   if (!token) {
     return {
       board: null,
@@ -370,6 +430,7 @@ export function useBoardConnection(): BoardConnectionState {
       createCardError: null,
       moveCard: () => {},
       staleVersionNotice: null,
+      deleteCard: () => {},
     };
   }
 
@@ -382,5 +443,6 @@ export function useBoardConnection(): BoardConnectionState {
     createCardError,
     moveCard,
     staleVersionNotice,
+    deleteCard,
   };
 }

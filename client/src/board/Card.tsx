@@ -5,9 +5,10 @@ import type { CardDto } from '../api/board';
 interface CardProps {
   card: CardDto;
   columnId: string;
+  deleteCard: (cardId: string) => void;
 }
 
-export function Card({ card, columnId }: CardProps) {
+export function Card({ card, columnId, deleteCard }: CardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { type: 'card', columnId },
@@ -34,6 +35,17 @@ export function Card({ card, columnId }: CardProps) {
       {import.meta.env.DEV && (
         <p style={{ fontSize: '0.75em', opacity: 0.6 }}>pos: {card.position.toFixed(4)}</p>
       )}
+      {/* `listeners` above (spread onto the article) is dnd-kit's PointerSensor
+          hook: it starts a drag on pointerdown anywhere inside the article,
+          including bubbled from this button. Stopping propagation on
+          pointerdown keeps a delete click from also kicking off a drag. */}
+      <button
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => deleteCard(card.id)}
+      >
+        Delete
+      </button>
     </article>
   );
 }

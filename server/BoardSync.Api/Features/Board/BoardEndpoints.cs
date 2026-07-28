@@ -20,6 +20,8 @@ public record CardMovedDto(Guid Id, Guid ColumnId, double Position, uint Version
 
 public record MoveRejectedDto(string Reason, Guid CardId, CardMovedDto? Card, string? WinnerDisplayName);
 
+public record DeleteCardRequest(Guid CardId, uint ExpectedVersion);
+
 public static class BoardEndpoints
 {
     public static void MapBoardEndpoints(this WebApplication app)

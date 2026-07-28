@@ -20,6 +20,7 @@ export function BoardPage() {
     createCardError,
     moveCard,
     staleVersionNotice,
+    deleteCard,
   } = useBoardConnection();
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -98,6 +99,7 @@ export function BoardPage() {
                   column={column}
                   createCard={createCard}
                   createCardError={createCardError}
+                  deleteCard={deleteCard}
                 />
               ))}
             </div>

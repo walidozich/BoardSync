@@ -17,9 +17,10 @@ public abstract record CreateCardResult
 }
 
 /// <summary>
-/// Not exhaustively matched anywhere outside BoardHub's own switch -- a later phase (delete)
-/// adds a CardDeleted case here once DeleteCard exists, and that addition should only ever
-/// require touching the hub's switch, not any other consumer.
+/// Not exhaustively matched anywhere outside BoardHub's own switch. Delete is a distinct
+/// operation with its own DeleteCardResult below rather than a case added here, since a
+/// deleted card was never "moved" -- CreateCard/MoveCard/DeleteCard each get their own result
+/// type in this same style.
 /// </summary>
 public abstract record MoveCardResult
 {
@@ -41,6 +42,21 @@ public abstract record MoveCardResult
     /// snap to the truth and say who got there first.
     /// </summary>
     public sealed record StaleVersion(Card AuthoritativeCard, string WinnerDisplayName) : MoveCardResult;
+}
+
+public abstract record DeleteCardResult
+{
+    public sealed record Success : DeleteCardResult;
+
+    public sealed record CardNotFound : DeleteCardResult;
+
+    /// <summary>
+    /// Same meaning as MoveCardResult.StaleVersion: someone else's write (a move, most likely)
+    /// landed first and bumped the row's version out from under this delete request. The row
+    /// still exists -- AuthoritativeCard is its current real state -- so this is a genuine
+    /// rejection, distinct from the two-deletes-race case below, which is treated as success.
+    /// </summary>
+    public sealed record StaleVersion(Card AuthoritativeCard, string WinnerDisplayName) : DeleteCardResult;
 }
 
 public enum RejectReason
@@ -245,6 +261,47 @@ public sealed class CardService(AppDbContext db, IConfiguration configuration)
         }
 
         return new MoveCardResult.Success(card, needsRenormalization);
+    }
+
+    public async Task<DeleteCardResult> DeleteAsync(Guid cardId, uint expectedVersion)
+    {
+        var card = await db.Cards.FirstOrDefaultAsync(c => c.Id == cardId);
+        if (card is null)
+        {
+            return new DeleteCardResult.CardNotFound();
+        }
+
+        db.Cards.Remove(card);
+
+        // Same reasoning as MoveAsync's OriginalValue force: this makes the DELETE's WHERE
+        // clause check against the version the *client* last saw, not whatever this method's
+        // own SELECT just returned, so a write that landed in between is caught as a
+        // concurrency conflict instead of silently deleting a row someone just changed.
+        db.Entry(card).Property(c => c.Version).OriginalValue = expectedVersion;
+
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            var authoritative = await db.Cards.AsNoTracking().FirstOrDefaultAsync(c => c.Id == cardId);
+            if (authoritative is not null)
+            {
+                // The row still exists but with a different version: someone else's write
+                // (a move, most likely) landed first.
+                return new DeleteCardResult.StaleVersion(authoritative, authoritative.LastModifiedBy ?? "another user");
+            }
+
+            // The row is gone, but not because *this* delete removed it: someone else's
+            // delete landed first. Deliberately treated as success, not a rejection -- the
+            // caller's desired end state ("this card does not exist") is already true, and
+            // there's no meaningful "rejected because already deleted" concept to surface
+            // here. This makes delete idempotent under a two-deletes race.
+            return new DeleteCardResult.Success();
+        }
+
+        return new DeleteCardResult.Success();
     }
 
     /// <summary>

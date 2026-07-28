@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyCardCreated,
+  applyCardDeleted,
   applyCardMoved,
   applyMoveRejected,
   type CardCreatedEvent,
@@ -325,5 +326,48 @@ describe('applyMoveRejected', () => {
     const result = applyMoveRejected(null, makeRejectedEvent());
 
     expect(result).toBeNull();
+  });
+});
+
+describe('applyCardDeleted', () => {
+  it('removes the card from its column, leaving other cards untouched', () => {
+    const board = makeThreeCardBoard();
+    const result = applyCardDeleted(board, 'card-b');
+
+    const column = result!.columns.find((c) => c.id === 'col-1')!;
+    expect(column.cards.map((c) => c.id)).toEqual(['card-a', 'card-c']);
+
+    const otherColumn = result!.columns.find((c) => c.id === 'col-2')!;
+    expect(otherColumn.cards.map((c) => c.id)).toEqual(['card-x', 'card-y']);
+  });
+
+  it('leaves other columns untouched by reference', () => {
+    const board = makeThreeCardBoard();
+    const result = applyCardDeleted(board, 'card-a');
+
+    expect(result!.columns.find((c) => c.id === 'col-2')).toBe(board.columns[1]);
+  });
+
+  it('returns the same board reference when board is null', () => {
+    expect(applyCardDeleted(null, 'card-a')).toBeNull();
+  });
+
+  it('returns the same board reference when the card is not found in any column', () => {
+    const board = makeThreeCardBoard();
+    const result = applyCardDeleted(board, 'does-not-exist');
+
+    expect(result).toBe(board);
+  });
+
+  it('does not mutate the original board object (immutable update)', () => {
+    const board = makeThreeCardBoard();
+    const originalColumns = board.columns;
+
+    const result = applyCardDeleted(board, 'card-a');
+
+    expect(result).not.toBe(board);
+    expect(result!.columns).not.toBe(originalColumns);
+    expect(board.columns).toBe(originalColumns);
+    expect(board.columns[0].cards).toHaveLength(3);
   });
 });

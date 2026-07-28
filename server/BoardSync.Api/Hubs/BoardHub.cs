@@ -165,6 +165,51 @@ public sealed class BoardHub(AppDbContext db, PresenceTracker presence, CardServ
         }
     }
 
+    // Broadcasts a bare card id to the whole group, including whoever deleted it -- same
+    // "everyone reconciles against the same broadcast" reasoning as CreateCard/MoveCard.
+    // Rejections reuse MoveRejectedDto/"MoveRejected": CardNotFound and StaleVersion are
+    // structurally identical outcomes to move's, so there's no separate DeleteRejected event.
+    public async Task DeleteCard(DeleteCardRequest request)
+    {
+        var result = await cardService.DeleteAsync(request.CardId, request.ExpectedVersion);
+
+        switch (result)
+        {
+            case DeleteCardResult.Success:
+                var boardId = await BoardQueries.GetBoardIdAsync(db);
+                if (boardId is null)
+                {
+                    break; // shouldn't happen -- the delete itself required an existing board via FK
+                }
+
+                await Clients.Group(boardId.Value.ToString()).SendAsync("CardDeleted", request.CardId);
+                break;
+            case DeleteCardResult.CardNotFound:
+                await Clients.Caller.SendAsync(
+                    "MoveRejected",
+                    new MoveRejectedDto(nameof(RejectReason.CardNotFound), request.CardId, Card: null, WinnerDisplayName: null)
+                );
+                break;
+            case DeleteCardResult.StaleVersion staleVersion:
+                var authoritativeDto = new CardMovedDto(
+                    staleVersion.AuthoritativeCard.Id,
+                    staleVersion.AuthoritativeCard.ColumnId,
+                    staleVersion.AuthoritativeCard.Position,
+                    staleVersion.AuthoritativeCard.Version
+                );
+                await Clients.Caller.SendAsync(
+                    "MoveRejected",
+                    new MoveRejectedDto(
+                        nameof(RejectReason.StaleVersion),
+                        request.CardId,
+                        authoritativeDto,
+                        staleVersion.WinnerDisplayName
+                    )
+                );
+                break;
+        }
+    }
+
     public override async Task OnConnectedAsync()
     {
         var isNewUser = presence.AddConnection(GetUserId(), GetDisplayName(), Context.ConnectionId);
