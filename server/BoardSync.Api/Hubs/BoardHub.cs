@@ -108,6 +108,21 @@ public sealed class BoardHub(AppDbContext db, PresenceTracker presence, CardServ
                     break; // shouldn't happen -- the move itself required an existing board via FK
                 }
 
+                if (success.Renormalized)
+                {
+                    // Renormalizing rewrote every other card's position (and xmin) in the
+                    // target column too, so a single CardMoved for just the dragged card would
+                    // leave every other client's cached versions silently wrong. A full
+                    // snapshot is the honest fix for a rare event on a small board.
+                    var snapshot = await BoardQueries.GetBoardStateAsync(db);
+                    if (snapshot is not null)
+                    {
+                        await Clients.Group(boardId.Value.ToString()).SendAsync("BoardSnapshot", snapshot);
+                    }
+
+                    break;
+                }
+
                 var dto = new CardMovedDto(
                     success.Card.Id,
                     success.Card.ColumnId,

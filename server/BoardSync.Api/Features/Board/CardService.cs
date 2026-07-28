@@ -23,7 +23,12 @@ public abstract record CreateCardResult
 /// </summary>
 public abstract record MoveCardResult
 {
-    public sealed record Success(Card Card) : MoveCardResult;
+    /// <summary>
+    /// Renormalized is true when this move also rewrote every card's position in the target
+    /// column (see RenormalizeColumnAsync) -- that changes every one of those cards' xmin, so
+    /// the hub must broadcast a full BoardSnapshot instead of a single CardMoved for this case.
+    /// </summary>
+    public sealed record Success(Card Card, bool Renormalized) : MoveCardResult;
 
     public sealed record CardNotFound : MoveCardResult;
 
@@ -59,6 +64,11 @@ public sealed class CardService(AppDbContext db, IConfiguration configuration)
     private const int MaxCardsOnBoard = 200;
     private const int MaxTitleLength = 200;
     private const int MaxDescriptionLength = 2000;
+
+    // Doubles carry ~15-16 significant digits, so this sits far from actual floating-point
+    // precision loss -- it's a deliberate design threshold (see spec.md), not defensive
+    // padding against imprecision.
+    private const double RenormalizationGapThreshold = 0.0001;
 
     public async Task<CreateCardResult> CreateAsync(Guid columnId, string title, string? description)
     {
@@ -152,6 +162,7 @@ public sealed class CardService(AppDbContext db, IConfiguration configuration)
         var beforeCardValid = beforeCardId is null || (beforeCard is not null && beforeCard.ColumnId == targetColumnId);
 
         double position;
+        var needsRenormalization = false;
         if (!afterCardValid || !beforeCardValid)
         {
             // A named neighbour vanished from under the request (deleted, or moved elsewhere by
@@ -163,10 +174,19 @@ public sealed class CardService(AppDbContext db, IConfiguration configuration)
         }
         else if (afterCard is not null && beforeCard is not null)
         {
+            // Repeatedly dropping into the same tightening slot (always immediately above the
+            // same lower neighbour, say) halves this gap every time: 1000, 500, 250, ... After
+            // roughly 23 drops the halved gap would fall under the threshold, at which point
+            // the column is renumbered instead of splitting a practically-zero gap again.
+            var gap = beforeCard.Position - afterCard.Position;
+            needsRenormalization = gap < RenormalizationGapThreshold * 2;
             position = (afterCard.Position + beforeCard.Position) / 2;
         }
         else if (afterCard is null && beforeCard is not null)
         {
+            // Same halving problem, just against an implicit floor of 0 instead of a second
+            // neighbour.
+            needsRenormalization = beforeCard.Position < RenormalizationGapThreshold * 2;
             position = beforeCard.Position / 2;
         }
         else if (afterCard is not null && beforeCard is null)
@@ -176,6 +196,11 @@ public sealed class CardService(AppDbContext db, IConfiguration configuration)
         else
         {
             position = 1000;
+        }
+
+        if (needsRenormalization)
+        {
+            position = await RenormalizeColumnAsync(targetColumnId, cardId, position);
         }
 
         // Dev-only, refused outside Development at startup (see Program.cs). Widens the real
@@ -219,7 +244,7 @@ public sealed class CardService(AppDbContext db, IConfiguration configuration)
             return new MoveCardResult.StaleVersion(authoritative, authoritative.LastModifiedBy ?? "another user");
         }
 
-        return new MoveCardResult.Success(card);
+        return new MoveCardResult.Success(card, needsRenormalization);
     }
 
     /// <summary>
@@ -239,5 +264,48 @@ public sealed class CardService(AppDbContext db, IConfiguration configuration)
 
         var maxPosition = await query.Select(c => (double?)c.Position).MaxAsync();
         return (maxPosition ?? 0) + 1000;
+    }
+
+    /// <summary>
+    /// Rewrites every other card in the column to evenly spaced positions (1000, 2000, 3000,
+    /// ...) and returns the slot reserved for the moving card, in the same ordering it would
+    /// have landed in under normal midpoint math. Tracked (not AsNoTracking), so these rewrites
+    /// ride the same SaveChangesAsync transaction as the move itself -- each rewritten card's
+    /// own naturally-loaded Version is its concurrency check, so if anyone else touched one of
+    /// these cards since this method read it, that mismatch throws DbUpdateConcurrencyException
+    /// right alongside the moved card's own check, and the whole move is rejected rather than
+    /// partially applied.
+    /// </summary>
+    private async Task<double> RenormalizeColumnAsync(Guid columnId, Guid movingCardId, double provisionalPosition)
+    {
+        var otherCards = await db
+            .Cards.Where(c => c.ColumnId == columnId && c.Id != movingCardId)
+            .OrderBy(c => c.Position)
+            .ToListAsync();
+
+        const double step = 1000;
+        var next = step;
+        var movedPosition = 0d;
+        var placedMovingCard = false;
+
+        foreach (var other in otherCards)
+        {
+            if (!placedMovingCard && provisionalPosition < other.Position)
+            {
+                movedPosition = next;
+                next += step;
+                placedMovingCard = true;
+            }
+
+            other.Position = next;
+            next += step;
+        }
+
+        if (!placedMovingCard)
+        {
+            movedPosition = next;
+        }
+
+        return movedPosition;
     }
 }

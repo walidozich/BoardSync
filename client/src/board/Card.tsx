@@ -27,6 +27,13 @@ export function Card({ card, columnId }: CardProps) {
     <article ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <p>{card.title}</p>
       {card.description !== null && <p>{card.description}</p>}
+      {/* Dev-only: makes renormalization's effect (positions halving toward the
+          threshold, then snapping back to round numbers) visible while dragging.
+          import.meta.env.DEV is Vite's own dev/prod flag -- stripped from
+          production builds, no new env var needed. */}
+      {import.meta.env.DEV && (
+        <p style={{ fontSize: '0.75em', opacity: 0.6 }}>pos: {card.position.toFixed(4)}</p>
+      )}
     </article>
   );
 }
