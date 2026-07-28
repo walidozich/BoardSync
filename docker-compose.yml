@@ -26,6 +26,12 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__Default: ${ConnectionStrings__Default}
       CorsOrigin: ${CorsOrigin}
+      Jwt__Secret: ${Jwt__Secret}
+      Jwt__Issuer: ${Jwt__Issuer}
+      Jwt__Audience: ${Jwt__Audience}
+      Jwt__LifetimeHours: ${Jwt__LifetimeHours}
+      RateLimiting__Auth__PermitLimit: ${RateLimiting__Auth__PermitLimit}
+      RateLimiting__Auth__WindowMinutes: ${RateLimiting__Auth__WindowMinutes}
     ports:
       - '${API_PORT:-5080}:8080'
     volumes:
