@@ -62,6 +62,7 @@ All three are wired by `docker-compose.yml` and configured entirely from `.env`.
 | `CorsOrigin` | `api` | The browser origin allowed to call the API. Must exactly match where the client is actually served from. Only needed in dev, where client and API run on different ports; production puts both behind one nginx origin and needs no CORS policy at all. |
 | `CLIENT_PORT` | `client` | Host port the client dev server is exposed on (default `5173`) |
 | `VITE_API_URL` | `client` (baked into the browser bundle) | The API's browser-facing URL. Must be reachable from your machine, not just from inside the Docker network — `http://localhost:5080`, never a service name like `http://api:8080`. |
+| `ConcurrencyDemo__ArtificialDelayMs` | `api` | Dev-only latency (ms) injected into `MoveCard` between position resolution and save, to widen the optimistic-concurrency race window for a live demo. Default `0`. The API refuses to start if this is non-zero and `ASPNETCORE_ENVIRONMENT` isn't `Development`. |
 
 Every variable above exists in both `.env.example` (placeholders) and `.env` (working values). If you introduce a new one while developing, add it to both files in the same commit — never leave one undocumented.
 
