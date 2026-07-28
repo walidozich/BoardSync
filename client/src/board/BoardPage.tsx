@@ -5,7 +5,7 @@ import { useBoardConnection } from './useBoardConnection';
 
 export function BoardPage() {
   const { displayName, logout } = useAuth();
-  const { board, presence, status, error } = useBoardConnection();
+  const { board, presence, status, error, createCard, createCardError } = useBoardConnection();
 
   return (
     <main>
@@ -26,7 +26,12 @@ export function BoardPage() {
           <h1>{board.name}</h1>
           <div style={{ display: 'flex', flexDirection: 'row' }}>
             {board.columns.map((column) => (
-              <Column key={column.id} column={column} />
+              <Column
+                key={column.id}
+                column={column}
+                createCard={createCard}
+                createCardError={createCardError}
+              />
             ))}
           </div>
         </>

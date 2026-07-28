@@ -8,6 +8,12 @@ public record BoardColumnDto(Guid Id, string Name, double Position, IReadOnlyLis
 
 public record CardDto(Guid Id, string Title, string? Description, double Position, uint Version);
 
+public record CreateCardRequest(Guid ColumnId, string Title, string? Description);
+
+public record CardCreatedDto(Guid Id, Guid ColumnId, string Title, string? Description, double Position, uint Version);
+
+public record CreateCardRejectedDto(string Reason, IReadOnlyDictionary<string, string[]>? Errors);
+
 public static class BoardEndpoints
 {
     public static void MapBoardEndpoints(this WebApplication app)

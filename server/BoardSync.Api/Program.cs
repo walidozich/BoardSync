@@ -123,6 +123,10 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddSignalR();
 
+// Scoped, not singleton: it holds no state of its own, but takes a scoped AppDbContext, so a
+// singleton registration would capture a disposed DbContext across requests.
+builder.Services.AddScoped<CardService>();
+
 const string ClientCorsPolicy = "Client";
 builder.Services.AddCors(options =>
 {

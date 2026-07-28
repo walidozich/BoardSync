@@ -54,4 +54,12 @@ public static class BoardQueries
 
         return new BoardStateDto(board.Id, board.Name, columnDtos);
     }
+
+    /// <summary>
+    /// Lightweight lookup for callers that only need the board's id (e.g. CardService's
+    /// broadcast group name) and would otherwise waste a full board+columns+cards load just to
+    /// read one field. Null when no board is seeded, same as GetBoardStateAsync.
+    /// </summary>
+    public static Task<Guid?> GetBoardIdAsync(AppDbContext db) =>
+        db.Boards.AsNoTracking().Select(b => (Guid?)b.Id).FirstOrDefaultAsync();
 }

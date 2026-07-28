@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using BoardSync.Api.Data;
+using BoardSync.Api.Features.Board;
 using BoardSync.Api.Presence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
@@ -20,7 +21,7 @@ namespace BoardSync.Api.Hubs;
 /// to all connected clients rather than a specific group.
 /// </summary>
 [Authorize]
-public sealed class BoardHub(AppDbContext db, PresenceTracker presence) : Hub
+public sealed class BoardHub(AppDbContext db, PresenceTracker presence, CardService cardService) : Hub
 {
     public async Task JoinBoard()
     {
@@ -32,6 +33,55 @@ public sealed class BoardHub(AppDbContext db, PresenceTracker presence) : Hub
 
         await Groups.AddToGroupAsync(Context.ConnectionId, snapshot.Id.ToString());
         await Clients.Caller.SendAsync("BoardSnapshot", snapshot);
+    }
+
+    // Broadcasts to the whole group, including the card's own creator: this phase doesn't do
+    // optimistic client-side updates (that's MoveCard's job later, where drag demands instant
+    // feedback), so the creator's own UI waits for the same broadcast as everyone else.
+    public async Task CreateCard(CreateCardRequest request)
+    {
+        var result = await cardService.CreateAsync(request.ColumnId, request.Title, request.Description);
+
+        switch (result)
+        {
+            case CreateCardResult.Success success:
+                var boardId = await BoardQueries.GetBoardIdAsync(db);
+                if (boardId is null)
+                {
+                    // no board seeded — shouldn't happen, since the card was just created
+                    // against an existing column, which itself requires an existing board via FK
+                    break;
+                }
+
+                var dto = new CardCreatedDto(
+                    success.Card.Id,
+                    success.Card.ColumnId,
+                    success.Card.Title,
+                    success.Card.Description,
+                    success.Card.Position,
+                    success.Card.Version
+                );
+                await Clients.Group(boardId.Value.ToString()).SendAsync("CardCreated", dto);
+                break;
+            case CreateCardResult.ValidationFailed failed:
+                await Clients.Caller.SendAsync(
+                    "CreateCardRejected",
+                    new CreateCardRejectedDto(nameof(RejectReason.Invalid), failed.Errors)
+                );
+                break;
+            case CreateCardResult.ColumnNotFound:
+                await Clients.Caller.SendAsync(
+                    "CreateCardRejected",
+                    new CreateCardRejectedDto(nameof(RejectReason.ColumnNotFound), null)
+                );
+                break;
+            case CreateCardResult.BoardFull:
+                await Clients.Caller.SendAsync(
+                    "CreateCardRejected",
+                    new CreateCardRejectedDto(nameof(RejectReason.BoardFull), null)
+                );
+                break;
+        }
     }
 
     public override async Task OnConnectedAsync()
