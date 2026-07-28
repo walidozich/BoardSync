@@ -109,7 +109,13 @@ public sealed class MoveCardHubTests(BoardSyncApiFactory factory)
         {
             await mover.InvokeAsync(
                 "MoveCard",
-                new MoveCardRequest(card.Id, columnId, AfterCardId: null, BeforeCardId: null, ExpectedVersion: 0)
+                new MoveCardRequest(
+                    card.Id,
+                    columnId,
+                    AfterCardId: null,
+                    BeforeCardId: null,
+                    ExpectedVersion: card.Version
+                )
             );
 
             var otherCompleted = await Task.WhenAny(otherReceived.Task, Task.Delay(WaitTimeout));
@@ -149,7 +155,13 @@ public sealed class MoveCardHubTests(BoardSyncApiFactory factory)
         {
             await mover.InvokeAsync(
                 "MoveCard",
-                new MoveCardRequest(card.Id, columnId, AfterCardId: null, BeforeCardId: null, ExpectedVersion: 0)
+                new MoveCardRequest(
+                    card.Id,
+                    columnId,
+                    AfterCardId: null,
+                    BeforeCardId: null,
+                    ExpectedVersion: card.Version
+                )
             );
 
             var moverCompleted = await Task.WhenAny(moverReceived.Task, Task.Delay(WaitTimeout));

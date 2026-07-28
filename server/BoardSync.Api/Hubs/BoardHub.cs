@@ -95,7 +95,8 @@ public sealed class BoardHub(AppDbContext db, PresenceTracker presence, CardServ
             request.TargetColumnId,
             request.AfterCardId,
             request.BeforeCardId,
-            request.ExpectedVersion
+            request.ExpectedVersion,
+            GetDisplayName()
         );
 
         switch (result)
@@ -118,13 +119,32 @@ public sealed class BoardHub(AppDbContext db, PresenceTracker presence, CardServ
             case MoveCardResult.CardNotFound:
                 await Clients.Caller.SendAsync(
                     "MoveRejected",
-                    new MoveRejectedDto(nameof(RejectReason.CardNotFound), request.CardId)
+                    new MoveRejectedDto(nameof(RejectReason.CardNotFound), request.CardId, Card: null, WinnerDisplayName: null)
                 );
                 break;
             case MoveCardResult.ColumnNotFound:
                 await Clients.Caller.SendAsync(
                     "MoveRejected",
-                    new MoveRejectedDto(nameof(RejectReason.ColumnNotFound), request.CardId)
+                    new MoveRejectedDto(nameof(RejectReason.ColumnNotFound), request.CardId, Card: null, WinnerDisplayName: null)
+                );
+                break;
+            case MoveCardResult.StaleVersion staleVersion:
+                // Caller only, never the group: nothing actually changed from anyone else's
+                // point of view, so there's nothing for the rest of the group to react to.
+                var authoritativeDto = new CardMovedDto(
+                    staleVersion.AuthoritativeCard.Id,
+                    staleVersion.AuthoritativeCard.ColumnId,
+                    staleVersion.AuthoritativeCard.Position,
+                    staleVersion.AuthoritativeCard.Version
+                );
+                await Clients.Caller.SendAsync(
+                    "MoveRejected",
+                    new MoveRejectedDto(
+                        nameof(RejectReason.StaleVersion),
+                        request.CardId,
+                        authoritativeDto,
+                        staleVersion.WinnerDisplayName
+                    )
                 );
                 break;
         }

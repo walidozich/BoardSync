@@ -18,7 +18,7 @@ public record MoveCardRequest(Guid CardId, Guid TargetColumnId, Guid? AfterCardI
 
 public record CardMovedDto(Guid Id, Guid ColumnId, double Position, uint Version);
 
-public record MoveRejectedDto(string Reason, Guid CardId);
+public record MoveRejectedDto(string Reason, Guid CardId, CardMovedDto? Card, string? WinnerDisplayName);
 
 public static class BoardEndpoints
 {

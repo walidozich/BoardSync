@@ -1,6 +1,7 @@
 using BoardSync.Api.Data;
 using BoardSync.Api.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace BoardSync.Api.Features.Board;
 
@@ -16,9 +17,9 @@ public abstract record CreateCardResult
 }
 
 /// <summary>
-/// Not exhaustively matched anywhere outside BoardHub's own switch -- a future phase adds
-/// StaleVersion and CardDeleted cases here once optimistic-concurrency enforcement lands, and
-/// that addition should only ever require touching the hub's switch, not any other consumer.
+/// Not exhaustively matched anywhere outside BoardHub's own switch -- a later phase (delete)
+/// adds a CardDeleted case here once DeleteCard exists, and that addition should only ever
+/// require touching the hub's switch, not any other consumer.
 /// </summary>
 public abstract record MoveCardResult
 {
@@ -27,6 +28,14 @@ public abstract record MoveCardResult
     public sealed record CardNotFound : MoveCardResult;
 
     public sealed record ColumnNotFound : MoveCardResult;
+
+    /// <summary>
+    /// The client's ExpectedVersion no longer matches the row: someone else's write landed
+    /// first. AuthoritativeCard is the card's current, real state (the client's own move never
+    /// applied) and WinnerDisplayName names whoever's write actually won, so the loser's UI can
+    /// snap to the truth and say who got there first.
+    /// </summary>
+    public sealed record StaleVersion(Card AuthoritativeCard, string WinnerDisplayName) : MoveCardResult;
 }
 
 public enum RejectReason
@@ -35,16 +44,17 @@ public enum RejectReason
     ColumnNotFound,
     BoardFull,
     CardNotFound,
+    StaleVersion,
 }
 
 /// <summary>
 /// All card mutation logic lives here, independent of SignalR: it takes plain values in and
 /// returns a typed result out, never touching Hub/Clients/anything hub-related. This is what
-/// lets a future phase's concurrency-conflict logic race two DbContext instances directly
-/// against this class, with no SignalR in the loop at all. MoveCard and DeleteCard (later
-/// phases) extend this same class and follow the same result-type pattern.
+/// lets the concurrency-conflict tests race two DbContext instances directly against this
+/// class, with no SignalR in the loop at all. DeleteCard (a later phase) extends this same
+/// class and follows the same result-type pattern.
 /// </summary>
-public sealed class CardService(AppDbContext db)
+public sealed class CardService(AppDbContext db, IConfiguration configuration)
 {
     private const int MaxCardsOnBoard = 200;
     private const int MaxTitleLength = 200;
@@ -115,10 +125,8 @@ public sealed class CardService(AppDbContext db)
         Guid targetColumnId,
         Guid? afterCardId,
         Guid? beforeCardId,
-        // Accepted now but not yet enforced -- the concurrency-conflict check (comparing this
-        // against the card's stored Version and rejecting stale moves) lands next phase. Taking
-        // it in the signature now means only the implementation changes then, not the contract.
-        uint expectedVersion
+        uint expectedVersion,
+        string movedBy
     )
     {
         var card = await db.Cards.FirstOrDefaultAsync(c => c.Id == cardId);
@@ -170,9 +178,46 @@ public sealed class CardService(AppDbContext db)
             position = 1000;
         }
 
+        // Dev-only, refused outside Development at startup (see Program.cs). Widens the real
+        // race window -- normally one network round-trip -- wide enough to trigger the
+        // conflict live on demand instead of only under a forced two-DbContext test.
+        var artificialDelayMs = configuration.GetValue("ConcurrencyDemo:ArtificialDelayMs", 0);
+        if (artificialDelayMs > 0)
+        {
+            await Task.Delay(artificialDelayMs);
+        }
+
         card.ColumnId = targetColumnId;
         card.Position = position;
-        await db.SaveChangesAsync();
+        card.LastModifiedBy = movedBy;
+
+        // Forces the UPDATE's WHERE clause to check against the version the *client* last
+        // saw, not whatever this method's own SELECT just returned -- that's what turns a
+        // plain write into an optimistic-concurrency check. If someone else's write landed
+        // between the client loading this version and this call, zero rows match and EF
+        // Core throws DbUpdateConcurrencyException below, which is expected control flow
+        // here, not a failure to be logged.
+        db.Entry(card).Property(c => c.Version).OriginalValue = expectedVersion;
+
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Zero rows matched. Re-query for the row's real current state: with no
+            // DeleteCard yet, nothing in this codebase can make that row disappear, so a
+            // null result here is a genuine invariant violation, not a case to route
+            // around silently -- fail loudly rather than let a future bug through quietly.
+            var authoritative =
+                await db.Cards.AsNoTracking().FirstOrDefaultAsync(c => c.Id == cardId)
+                ?? throw new InvalidOperationException(
+                    $"Card {cardId} vanished during a concurrency conflict, but nothing in "
+                        + "this codebase can delete a card yet. This should be unreachable."
+                );
+
+            return new MoveCardResult.StaleVersion(authoritative, authoritative.LastModifiedBy ?? "another user");
+        }
 
         return new MoveCardResult.Success(card);
     }

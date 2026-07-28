@@ -38,6 +38,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             b.Property(c => c.Title).HasMaxLength(200).IsRequired();
             b.Property(c => c.Description).HasMaxLength(2000);
+            // Matches User.DisplayName's own max length -- this always holds a copy of
+            // whichever display name was current for the mover at the time of the write.
+            b.Property(c => c.LastModifiedBy).HasMaxLength(50);
             b.Property(c => c.Version)
                 .HasColumnName("xmin")
                 .HasColumnType("xid")

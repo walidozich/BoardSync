@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   applyCardCreated,
   applyCardMoved,
+  applyMoveRejected,
   type CardCreatedEvent,
   type CardMovedEvent,
+  type MoveRejectedEvent,
 } from './useBoardConnection';
 import type { BoardDto } from '../api/board';
 
@@ -62,6 +64,16 @@ function makeMovedEvent(overrides: Partial<CardMovedEvent> = {}): CardMovedEvent
     columnId: 'col-1',
     position: 0,
     version: 2,
+    ...overrides,
+  };
+}
+
+function makeRejectedEvent(overrides: Partial<MoveRejectedEvent> = {}): MoveRejectedEvent {
+  return {
+    reason: 'StaleVersion',
+    cardId: 'card-a',
+    card: makeMovedEvent(),
+    winnerDisplayName: 'Ahmed',
     ...overrides,
   };
 }
@@ -253,5 +265,65 @@ describe('applyCardMoved', () => {
     expect(board.columns).toBe(originalColumns);
     expect(board.columns[0].cards).toHaveLength(3);
     expect(board.columns[1].cards).toHaveLength(2);
+  });
+});
+
+describe('applyMoveRejected', () => {
+  it('StaleVersion with a card payload restores the authoritative position', () => {
+    const board = makeThreeCardBoard();
+
+    const result = applyMoveRejected(
+      board,
+      makeRejectedEvent({
+        cardId: 'card-a',
+        card: makeMovedEvent({ id: 'card-a', columnId: 'col-2', position: 5, version: 9 }),
+      }),
+    );
+
+    expect(result!.columns[0].cards.map((c) => c.id)).toEqual(['card-b', 'card-c']);
+    const moved = result!.columns[1].cards.find((c) => c.id === 'card-a');
+    expect(moved).toMatchObject({ position: 5, version: 9 });
+  });
+
+  it('StaleVersion restores a same-column reorder to its authoritative position', () => {
+    const board = makeThreeCardBoard();
+
+    const result = applyMoveRejected(
+      board,
+      makeRejectedEvent({
+        cardId: 'card-c',
+        card: makeMovedEvent({ id: 'card-c', columnId: 'col-1', position: -1, version: 7 }),
+      }),
+    );
+
+    expect(result!.columns[0].cards.map((c) => c.id)).toEqual(['card-c', 'card-a', 'card-b']);
+  });
+
+  it('returns the same board reference for CardNotFound (no authoritative card to apply)', () => {
+    const board = makeThreeCardBoard();
+
+    const result = applyMoveRejected(
+      board,
+      makeRejectedEvent({ reason: 'CardNotFound', card: null, winnerDisplayName: null }),
+    );
+
+    expect(result).toBe(board);
+  });
+
+  it('returns the same board reference for ColumnNotFound (no authoritative card to apply)', () => {
+    const board = makeThreeCardBoard();
+
+    const result = applyMoveRejected(
+      board,
+      makeRejectedEvent({ reason: 'ColumnNotFound', card: null, winnerDisplayName: null }),
+    );
+
+    expect(result).toBe(board);
+  });
+
+  it('returns the same board reference when a null board is passed through', () => {
+    const result = applyMoveRejected(null, makeRejectedEvent());
+
+    expect(result).toBeNull();
   });
 });

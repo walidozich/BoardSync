@@ -11,8 +11,16 @@ interface DropTargetData {
 
 export function BoardPage() {
   const { displayName, logout } = useAuth();
-  const { board, presence, status, error, createCard, createCardError, moveCard } =
-    useBoardConnection();
+  const {
+    board,
+    presence,
+    status,
+    error,
+    createCard,
+    createCardError,
+    moveCard,
+    staleVersionNotice,
+  } = useBoardConnection();
   const sensors = useSensors(useSensor(PointerSensor));
 
   function handleDragEnd(event: DragEndEvent) {
@@ -74,6 +82,8 @@ export function BoardPage() {
 
       <p>Connection: {status}</p>
       <PresenceRoster users={presence} />
+
+      {staleVersionNotice && <p role="status">{staleVersionNotice}</p>}
 
       {error && <p>Could not load the board: {error}</p>}
       {!error && !board && <p>Loading...</p>}

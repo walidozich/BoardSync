@@ -8,5 +8,6 @@ public sealed class Card
     public string? Description { get; set; }
     public double Position { get; set; }
     public uint Version { get; set; }
+    public string? LastModifiedBy { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

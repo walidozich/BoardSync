@@ -34,8 +34,10 @@ export interface CardMovedEvent {
 }
 
 export interface MoveRejectedEvent {
-  reason: 'CardNotFound' | 'ColumnNotFound';
+  reason: 'CardNotFound' | 'ColumnNotFound' | 'StaleVersion';
   cardId: string;
+  card: CardMovedEvent | null;
+  winnerDisplayName: string | null;
 }
 
 export interface BoardConnectionState {
@@ -51,6 +53,7 @@ export interface BoardConnectionState {
     afterCardId: string | null,
     beforeCardId: string | null,
   ) => void;
+  staleVersionNotice: string | null;
 }
 
 /**
@@ -139,6 +142,26 @@ export function applyCardMoved(board: BoardDto | null, event: CardMovedEvent): B
   return { ...board, columns };
 }
 
+/**
+ * Reducer for a `MoveRejected` event's effect on board state. Pure, so the
+ * "StaleVersion restores the authoritative position" behavior is testable
+ * without mocking HubConnection, matching applyCardCreated/applyCardMoved.
+ * Only StaleVersion carries a payload worth applying: CardNotFound and
+ * ColumnNotFound have no authoritative card to snap to (the hook falls back
+ * to re-fetching a fresh snapshot for those instead, which is a side effect,
+ * not board-reducer logic, so it isn't part of this function).
+ */
+export function applyMoveRejected(
+  board: BoardDto | null,
+  event: MoveRejectedEvent,
+): BoardDto | null {
+  if (event.reason === 'StaleVersion' && event.card) {
+    return applyCardMoved(board, event.card);
+  }
+
+  return board;
+}
+
 export function useBoardConnection(): BoardConnectionState {
   const { token } = useAuth();
   const [board, setBoard] = useState<BoardDto | null>(null);
@@ -146,7 +169,20 @@ export function useBoardConnection(): BoardConnectionState {
   const [status, setStatus] = useState<BoardConnectionStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [createCardError, setCreateCardError] = useState<CreateCardRejectedEvent | null>(null);
+  const [staleVersionNotice, setStaleVersionNotice] = useState<string | null>(null);
   const connectionRef = useRef<HubConnection | null>(null);
+
+  // Auto-dismiss: a genuine timer side effect (not state derived from props), so this is
+  // exactly the case useEffect is for, unlike the "adjust state during render" pattern used
+  // elsewhere in this codebase for prop-driven state.
+  useEffect(() => {
+    if (!staleVersionNotice) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => setStaleVersionNotice(null), 4000);
+    return () => clearTimeout(timeoutId);
+  }, [staleVersionNotice]);
 
   useEffect(() => {
     if (!token) {
@@ -189,16 +225,30 @@ export function useBoardConnection(): BoardConnectionState {
       }
     });
 
-    connection.on('MoveRejected', () => {
-      // Minimal, defensive recovery: a move referenced a card/column that no
-      // longer exists (shouldn't happen via normal UI use). Rather than
-      // building bespoke per-card revert logic, just re-fetch a fresh,
-      // authoritative snapshot the same way the initial connect does.
-      if (!cancelled) {
-        connection.invoke('JoinBoard').catch((err: unknown) => {
-          console.error('JoinBoard invoke failed', err);
-        });
+    connection.on('MoveRejected', (event: MoveRejectedEvent) => {
+      if (cancelled) {
+        return;
       }
+
+      if (event.reason === 'StaleVersion' && event.card) {
+        // Someone else's move already landed first. Snap this card to the
+        // authoritative state the server just sent -- the same applyCardMoved
+        // path a real CardMoved broadcast uses, so the card animates to its
+        // true position exactly like any other move (dnd-kit's own sortable
+        // transition handles the animation, driven by the reordered list).
+        setBoard((prev) => applyMoveRejected(prev, event));
+        setStaleVersionNotice(`${event.winnerDisplayName ?? 'Someone'} moved this card first.`);
+        return;
+      }
+
+      // Minimal, defensive recovery for the remaining reasons (a move
+      // referenced a card/column that no longer exists -- shouldn't happen
+      // via normal UI use). Rather than building bespoke per-card revert
+      // logic for cases with no authoritative payload, just re-fetch a
+      // fresh snapshot the same way the initial connect does.
+      connection.invoke('JoinBoard').catch((err: unknown) => {
+        console.error('JoinBoard invoke failed', err);
+      });
     });
 
     connection.onclose(() => {
@@ -319,8 +369,18 @@ export function useBoardConnection(): BoardConnectionState {
       createCard: () => {},
       createCardError: null,
       moveCard: () => {},
+      staleVersionNotice: null,
     };
   }
 
-  return { board, presence, status, error, createCard, createCardError, moveCard };
+  return {
+    board,
+    presence,
+    status,
+    error,
+    createCard,
+    createCardError,
+    moveCard,
+    staleVersionNotice,
+  };
 }

@@ -32,6 +32,7 @@ services:
       Jwt__LifetimeHours: ${Jwt__LifetimeHours}
       RateLimiting__Auth__PermitLimit: ${RateLimiting__Auth__PermitLimit}
       RateLimiting__Auth__WindowMinutes: ${RateLimiting__Auth__WindowMinutes}
+      ConcurrencyDemo__ArtificialDelayMs: ${ConcurrencyDemo__ArtificialDelayMs}
     ports:
       - '${API_PORT:-5080}:8080'
     volumes:

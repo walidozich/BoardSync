@@ -52,7 +52,7 @@ public sealed class MoveCardServiceTests(BoardSyncApiFactory factory)
 
         try
         {
-            var result = await service.MoveAsync(moving.Id, column.Id, after.Id, before.Id, 0);
+            var result = await service.MoveAsync(moving.Id, column.Id, after.Id, before.Id, moving.Version, "Test Mover");
 
             var success = Assert.IsType<MoveCardResult.Success>(result);
             Assert.Equal((1000.0 + 2000.0) / 2, success.Card.Position);
@@ -79,7 +79,14 @@ public sealed class MoveCardServiceTests(BoardSyncApiFactory factory)
 
         try
         {
-            var result = await service.MoveAsync(moving.Id, column.Id, afterCardId: null, before.Id, 0);
+            var result = await service.MoveAsync(
+                moving.Id,
+                column.Id,
+                afterCardId: null,
+                before.Id,
+                moving.Version,
+                "Test Mover"
+            );
 
             var success = Assert.IsType<MoveCardResult.Success>(result);
             Assert.Equal(2000.0 / 2, success.Card.Position);
@@ -105,7 +112,14 @@ public sealed class MoveCardServiceTests(BoardSyncApiFactory factory)
 
         try
         {
-            var result = await service.MoveAsync(moving.Id, column.Id, after.Id, beforeCardId: null, 0);
+            var result = await service.MoveAsync(
+                moving.Id,
+                column.Id,
+                after.Id,
+                beforeCardId: null,
+                moving.Version,
+                "Test Mover"
+            );
 
             var success = Assert.IsType<MoveCardResult.Success>(result);
             Assert.Equal(1000.0 + 1000.0, success.Card.Position);
@@ -131,7 +145,14 @@ public sealed class MoveCardServiceTests(BoardSyncApiFactory factory)
 
         try
         {
-            var result = await service.MoveAsync(moving.Id, targetColumn.Id, afterCardId: null, beforeCardId: null, 0);
+            var result = await service.MoveAsync(
+                moving.Id,
+                targetColumn.Id,
+                afterCardId: null,
+                beforeCardId: null,
+                moving.Version,
+                "Test Mover"
+            );
 
             var success = Assert.IsType<MoveCardResult.Success>(result);
             Assert.Equal(1000, success.Card.Position);
@@ -159,7 +180,14 @@ public sealed class MoveCardServiceTests(BoardSyncApiFactory factory)
 
         try
         {
-            var result = await service.MoveAsync(moving.Id, column.Id, ghostId, beforeCardId: null, 0);
+            var result = await service.MoveAsync(
+                moving.Id,
+                column.Id,
+                ghostId,
+                beforeCardId: null,
+                moving.Version,
+                "Test Mover"
+            );
 
             var success = Assert.IsType<MoveCardResult.Success>(result);
             // Bottom of column excluding the moved card itself: max(existing.Position) + 1000.
@@ -190,7 +218,14 @@ public sealed class MoveCardServiceTests(BoardSyncApiFactory factory)
 
         try
         {
-            var result = await service.MoveAsync(moving.Id, targetColumn.Id, elsewhere.Id, beforeCardId: null, 0);
+            var result = await service.MoveAsync(
+                moving.Id,
+                targetColumn.Id,
+                elsewhere.Id,
+                beforeCardId: null,
+                moving.Version,
+                "Test Mover"
+            );
 
             var success = Assert.IsType<MoveCardResult.Success>(result);
             Assert.Equal(3000.0 + 1000.0, success.Card.Position);
@@ -224,7 +259,14 @@ public sealed class MoveCardServiceTests(BoardSyncApiFactory factory)
 
         try
         {
-            var result = await service.MoveAsync(moving.Id, column.Id, ghostId, beforeCardId: null, 0);
+            var result = await service.MoveAsync(
+                moving.Id,
+                column.Id,
+                ghostId,
+                beforeCardId: null,
+                moving.Version,
+                "Test Mover"
+            );
 
             var success = Assert.IsType<MoveCardResult.Success>(result);
             // Correct (moving card excluded from the max calc): max is `other` at 1000, so the
@@ -251,7 +293,7 @@ public sealed class MoveCardServiceTests(BoardSyncApiFactory factory)
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var columnId = await GetSeededColumnIdAsync(db, "Backlog");
 
-        var result = await service.MoveAsync(Guid.NewGuid(), columnId, null, null, 0);
+        var result = await service.MoveAsync(Guid.NewGuid(), columnId, null, null, 0, "Test Mover");
 
         Assert.IsType<MoveCardResult.CardNotFound>(result);
     }
@@ -268,7 +310,7 @@ public sealed class MoveCardServiceTests(BoardSyncApiFactory factory)
 
         try
         {
-            var result = await service.MoveAsync(card.Id, Guid.NewGuid(), null, null, 0);
+            var result = await service.MoveAsync(card.Id, Guid.NewGuid(), null, null, 0, "Test Mover");
 
             Assert.IsType<MoveCardResult.ColumnNotFound>(result);
         }

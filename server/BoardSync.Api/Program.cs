@@ -152,6 +152,20 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Read from app.Configuration (post-Build, same discipline as the DbContext/CORS/Jwt setup
+// above) rather than builder.Configuration, so WebApplicationFactory test overrides are seen.
+// Refused outright rather than silently clamped to 0: a nonzero delay outside Development is
+// almost certainly a config mistake left on from a demo, and it directly weakens every real
+// user's optimistic-concurrency window, so it should fail loudly at startup, not quietly ship.
+var concurrencyDemoDelayMs = app.Configuration.GetValue("ConcurrencyDemo:ArtificialDelayMs", 0);
+if (concurrencyDemoDelayMs > 0 && !app.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        $"ConcurrencyDemo:ArtificialDelayMs is set to {concurrencyDemoDelayMs} outside the "
+            + "Development environment. This dev-only demo toggle is refused everywhere else."
+    );
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
