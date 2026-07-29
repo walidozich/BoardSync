@@ -51,6 +51,10 @@ Three details this design gets right that a first attempt usually does not:
 - **Zero rows affected is ambiguous.** It means either "someone moved it first" or "someone deleted it mid-drag," and those need opposite responses from the client. Conflating them is how the loser of a delete race watches a card resurrect itself.
 - **The race is not reproducible by hand.** Because every change broadcasts, the genuine conflict window is one network round-trip wide. A deterministic integration test forces the interleaving, and a dev-only latency toggle widens the window so the conflict can be demonstrated live.
 
+This is proven end to end, not just at the integration level: [`client/e2e/concurrency-race.spec.ts`](client/e2e/concurrency-race.spec.ts) drives two real Playwright browser contexts through this exact scenario and asserts one wins and the other snaps back with the toast.
+
+![Two browsers racing to move the same card; one wins, the other snaps back](client/e2e/concurrency-race.gif)
+
 A full write-up lives in [`docs/`](docs/) once the project ships.
 
 ---
@@ -164,6 +168,12 @@ docker compose up
 ```
 
 Brings up Postgres, the API, and the client in one command. Full prerequisites, environment variables, and native (non-Docker) instructions live in [`SETUP.md`](SETUP.md).
+
+To run the two-browser concurrency race end to end (requires the stack above to already be running):
+
+```bash
+./scripts/run-e2e.sh
+```
 
 ---
 

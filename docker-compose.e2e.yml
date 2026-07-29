@@ -1,0 +1,13 @@
+# Overlay for phase 14's concurrency E2E test only. Widens the same optimistic-concurrency
+# race window used for manual live demoing (see ConcurrencyDemo__ArtificialDelayMs in
+# SETUP.md), but as a compose overlay instead of an .env edit so the normal dev stack's
+# behavior (delay = 0) never has to be touched or remembered to be reverted.
+#
+# Usage: scripts/run-e2e.sh, or manually:
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d api
+#   ...
+#   docker compose up -d api   # restores the base file's delay = 0
+services:
+  api:
+    environment:
+      ConcurrencyDemo__ArtificialDelayMs: 1500

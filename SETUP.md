@@ -75,7 +75,24 @@ dotnet test BoardSync.Tests/BoardSync.Tests.csproj
 
 Requires a local Docker daemon — the test suite spins up a real, throwaway Postgres container via Testcontainers for every test run (no mocking of the database). First run pulls the `postgres:17-alpine` image if it isn't already cached.
 
-Client tests (Vitest) are introduced starting phase 3; this section will grow a client test command when that lands.
+```bash
+# From the client/ directory
+pnpm test
+```
+
+### End-to-end (Playwright)
+
+One scenario: two real browsers drag the same card to different columns at once, proving live that one wins and the other snaps back with a toast. It needs the dev stack's api container running with a widened optimistic-concurrency window (the same `ConcurrencyDemo__ArtificialDelayMs` used for manual live demoing, see Environment variables above), which `docker-compose.e2e.yml` supplies as an overlay rather than an `.env` edit, so the normal dev stack is never left in a modified state.
+
+```bash
+# One-time, from client/
+pnpm exec playwright install chromium
+
+# From the project root, with the dev stack already up (docker compose up)
+./scripts/run-e2e.sh
+```
+
+This brings `api` up with the delay overlay, runs the test, restores `api` to its normal config, and composites both browsers' recordings into `client/e2e/concurrency-race.gif`. To run the test directly (e.g. against a stack you've already widened by hand): `cd client && pnpm test:e2e`.
 
 ## Linting and formatting
 
