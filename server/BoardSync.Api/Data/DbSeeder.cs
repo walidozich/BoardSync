@@ -1,4 +1,5 @@
 using BoardSync.Api.Data.Entities;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace BoardSync.Api.Data;
@@ -7,13 +8,37 @@ public static class DbSeeder
 {
     public const string DemoBoardName = "BoardSync Demo";
 
+    // Plaintext passwords are fixed dev-only values, documented in credentials.md (gitignored,
+    // never committed) at the project root -- never logged, and stored here only long enough
+    // to be hashed below.
+    public static readonly (string Email, string DisplayName, string Password)[] DemoUsers =
+    [
+        ("ahmed@example.com", "Ahmed", "boardsync-ahmed"),
+        ("sara@example.com", "Sara", "boardsync-sara"),
+    ];
+
     public static async Task SeedAsync(AppDbContext db)
     {
-        // Checked per-stage (board, then columns) rather than one global "anything seeded
-        // yet?" gate. A single gate on Boards.AnyAsync() would silently stop this method from
-        // ever seeding columns/cards on a database that already has the board from an earlier
-        // phase's run — exactly what happened to the persistent dev database once this phase
-        // added column/card seeding on top of phase 1's board-only seed.
+        // Checked per-stage (board, then columns, then users) rather than one global "anything
+        // seeded yet?" gate. A single gate on Boards.AnyAsync() would silently stop this method
+        // from ever seeding columns/cards/users on a database that already has the board from
+        // an earlier phase's run — exactly what happened to the persistent dev database once
+        // this phase added column/card seeding on top of phase 1's board-only seed, and again
+        // when this added user seeding on top of an already-columned database.
+        var hasher = new PasswordHasher<User>();
+        foreach (var (email, displayName, password) in DemoUsers)
+        {
+            if (await db.Users.AnyAsync(u => u.Email == email))
+            {
+                continue;
+            }
+
+            var user = new User { Email = email, DisplayName = displayName, PasswordHash = string.Empty };
+            user.PasswordHash = hasher.HashPassword(user, password);
+            db.Users.Add(user);
+        }
+        await db.SaveChangesAsync();
+
         var board = await db.Boards.FirstOrDefaultAsync(b => b.Name == DemoBoardName);
         if (board is null)
         {
