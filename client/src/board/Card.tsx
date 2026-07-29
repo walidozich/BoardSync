@@ -6,12 +6,14 @@ interface CardProps {
   card: CardDto;
   columnId: string;
   deleteCard: (cardId: string) => void;
+  disabled: boolean;
 }
 
-export function Card({ card, columnId, deleteCard }: CardProps) {
+export function Card({ card, columnId, deleteCard, disabled }: CardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { type: 'card', columnId },
+    disabled,
   });
 
   // Built by hand (rather than pulling in @dnd-kit/utilities' CSS.Transform
@@ -41,6 +43,7 @@ export function Card({ card, columnId, deleteCard }: CardProps) {
           pointerdown keeps a delete click from also kicking off a drag. */}
       <button
         type="button"
+        disabled={disabled}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => deleteCard(card.id)}
       >

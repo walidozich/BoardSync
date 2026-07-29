@@ -9,6 +9,7 @@ interface CreateCardFormProps {
   column: BoardColumnDto;
   createCard: (columnId: string, title: string, description: string | null) => void;
   createCardError: CreateCardRejectedEvent | null;
+  disabled: boolean;
 }
 
 function validate(title: string, description: string): Record<string, string> {
@@ -36,7 +37,12 @@ function reasonMessage(reason: CreateCardRejectedEvent['reason']): string {
   }
 }
 
-export function CreateCardForm({ column, createCard, createCardError }: CreateCardFormProps) {
+export function CreateCardForm({
+  column,
+  createCard,
+  createCardError,
+  disabled,
+}: CreateCardFormProps) {
   const [expanded, setExpanded] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -114,7 +120,7 @@ export function CreateCardForm({ column, createCard, createCardError }: CreateCa
 
   if (!expanded) {
     return (
-      <button type="button" onClick={() => setExpanded(true)}>
+      <button type="button" disabled={disabled} onClick={() => setExpanded(true)}>
         + Add card
       </button>
     );
@@ -136,7 +142,7 @@ export function CreateCardForm({ column, createCard, createCardError }: CreateCa
 
       {formError && <p role="alert">{formError}</p>}
 
-      <button type="submit" disabled={submitting}>
+      <button type="submit" disabled={submitting || disabled}>
         {submitting ? 'Adding…' : 'Add card'}
       </button>
       <button type="button" onClick={handleCancel} disabled={submitting}>

@@ -29,7 +29,14 @@ describe('CreateCardForm', () => {
   });
 
   it('rejects an empty title without calling createCard', async () => {
-    render(<CreateCardForm column={makeColumn()} createCard={createCard} createCardError={null} />);
+    render(
+      <CreateCardForm
+        column={makeColumn()}
+        createCard={createCard}
+        createCardError={null}
+        disabled={false}
+      />,
+    );
     const user = await openForm();
 
     await user.click(screen.getByRole('button', { name: 'Add card' }));
@@ -39,7 +46,14 @@ describe('CreateCardForm', () => {
   });
 
   it('rejects a description over 2000 characters without calling createCard', async () => {
-    render(<CreateCardForm column={makeColumn()} createCard={createCard} createCardError={null} />);
+    render(
+      <CreateCardForm
+        column={makeColumn()}
+        createCard={createCard}
+        createCardError={null}
+        disabled={false}
+      />,
+    );
     const user = await openForm();
 
     await user.type(screen.getByLabelText('Title'), 'Valid title');
@@ -55,7 +69,14 @@ describe('CreateCardForm', () => {
   });
 
   it('calls createCard with the trimmed title, column id, and null description when valid', async () => {
-    render(<CreateCardForm column={makeColumn()} createCard={createCard} createCardError={null} />);
+    render(
+      <CreateCardForm
+        column={makeColumn()}
+        createCard={createCard}
+        createCardError={null}
+        disabled={false}
+      />,
+    );
     const user = await openForm();
 
     await user.type(screen.getByLabelText('Title'), '  Ship the feature  ');
@@ -65,7 +86,14 @@ describe('CreateCardForm', () => {
   });
 
   it('calls createCard with a trimmed description when one is provided', async () => {
-    render(<CreateCardForm column={makeColumn()} createCard={createCard} createCardError={null} />);
+    render(
+      <CreateCardForm
+        column={makeColumn()}
+        createCard={createCard}
+        createCardError={null}
+        disabled={false}
+      />,
+    );
     const user = await openForm();
 
     await user.type(screen.getByLabelText('Title'), 'Ship the feature');
@@ -77,7 +105,12 @@ describe('CreateCardForm', () => {
 
   it('surfaces field-level errors from a CreateCardRejected event', async () => {
     const { rerender } = render(
-      <CreateCardForm column={makeColumn()} createCard={createCard} createCardError={null} />,
+      <CreateCardForm
+        column={makeColumn()}
+        createCard={createCard}
+        createCardError={null}
+        disabled={false}
+      />,
     );
     const user = await openForm();
 
@@ -89,7 +122,12 @@ describe('CreateCardForm', () => {
       errors: { Title: ['Title is already used in this column.'] },
     };
     rerender(
-      <CreateCardForm column={makeColumn()} createCard={createCard} createCardError={rejection} />,
+      <CreateCardForm
+        column={makeColumn()}
+        createCard={createCard}
+        createCardError={rejection}
+        disabled={false}
+      />,
     );
 
     expect(await screen.findByText('Title is already used in this column.')).toBeInTheDocument();
@@ -97,7 +135,12 @@ describe('CreateCardForm', () => {
 
   it('surfaces a general error message when the rejection has no field errors', async () => {
     const { rerender } = render(
-      <CreateCardForm column={makeColumn()} createCard={createCard} createCardError={null} />,
+      <CreateCardForm
+        column={makeColumn()}
+        createCard={createCard}
+        createCardError={null}
+        disabled={false}
+      />,
     );
     const user = await openForm();
 
@@ -106,7 +149,12 @@ describe('CreateCardForm', () => {
 
     const rejection: CreateCardRejectedEvent = { reason: 'BoardFull', errors: null };
     rerender(
-      <CreateCardForm column={makeColumn()} createCard={createCard} createCardError={rejection} />,
+      <CreateCardForm
+        column={makeColumn()}
+        createCard={createCard}
+        createCardError={rejection}
+        disabled={false}
+      />,
     );
 
     expect(await screen.findByText(/board is full/i)).toBeInTheDocument();
@@ -115,7 +163,12 @@ describe('CreateCardForm', () => {
   it('clears and closes the form when a card lands in this column while submitting', async () => {
     const column = makeColumn();
     const { rerender } = render(
-      <CreateCardForm column={column} createCard={createCard} createCardError={null} />,
+      <CreateCardForm
+        column={column}
+        createCard={createCard}
+        createCardError={null}
+        disabled={false}
+      />,
     );
     const user = await openForm();
 
@@ -130,7 +183,12 @@ describe('CreateCardForm', () => {
       ],
     });
     rerender(
-      <CreateCardForm column={updatedColumn} createCard={createCard} createCardError={null} />,
+      <CreateCardForm
+        column={updatedColumn}
+        createCard={createCard}
+        createCardError={null}
+        disabled={false}
+      />,
     );
 
     expect(await screen.findByRole('button', { name: '+ Add card' })).toBeInTheDocument();
@@ -138,7 +196,14 @@ describe('CreateCardForm', () => {
 
   it('does not treat an unrelated re-render as success while awaiting a rejection', async () => {
     const column = makeColumn();
-    render(<CreateCardForm column={column} createCard={createCard} createCardError={null} />);
+    render(
+      <CreateCardForm
+        column={column}
+        createCard={createCard}
+        createCardError={null}
+        disabled={false}
+      />,
+    );
     const user = await openForm();
 
     await user.type(screen.getByLabelText('Title'), 'Ship the feature');

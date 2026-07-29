@@ -67,4 +67,44 @@ describe('App protected route', () => {
     expect(screen.getByRole('list', { name: 'Currently connected' })).toBeInTheDocument();
     expect(screen.getByText('Carol')).toBeInTheDocument();
   });
+
+  it('disables card interactions while reconnecting', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: 'xyz', displayName: 'Bob' }));
+    vi.spyOn(useBoardConnectionModule, 'useBoardConnection').mockReturnValue({
+      status: 'reconnecting',
+      error: null,
+      presence: [],
+      createCard: vi.fn(),
+      createCardError: null,
+      moveCard: vi.fn(),
+      moveRejectedNotice: null,
+      deleteCard: vi.fn(),
+      board: {
+        id: '1',
+        name: 'BoardSync Demo',
+        columns: [
+          {
+            id: 'col-1',
+            name: 'To Do',
+            position: 0,
+            cards: [
+              {
+                id: 'card-1',
+                title: 'First card',
+                description: null,
+                position: 0,
+                version: 1,
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    render(<App />);
+
+    expect(screen.getByText('Connection: reconnecting')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '+ Add card' })).toBeDisabled();
+  });
 });

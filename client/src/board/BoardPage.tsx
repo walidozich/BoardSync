@@ -23,10 +23,11 @@ export function BoardPage() {
     deleteCard,
   } = useBoardConnection();
   const sensors = useSensors(useSensor(PointerSensor));
+  const isConnected = status === 'connected';
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (!board || !over || active.id === over.id) {
+    if (!isConnected || !board || !over || active.id === over.id) {
       return;
     }
 
@@ -100,6 +101,7 @@ export function BoardPage() {
                   createCard={createCard}
                   createCardError={createCardError}
                   deleteCard={deleteCard}
+                  disabled={!isConnected}
                 />
               ))}
             </div>

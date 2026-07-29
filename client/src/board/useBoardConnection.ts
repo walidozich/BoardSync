@@ -5,7 +5,7 @@ import { useAuth } from '../auth/auth-context';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5080';
 
-export type BoardConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+export type BoardConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
 export interface PresenceUser {
   id: string;
@@ -226,8 +226,15 @@ export function useBoardConnection(): BoardConnectionState {
       return;
     }
 
+    // withAutomaticReconnect uses SignalR's default retry delays (0s, 2s, 10s, 30s) before
+    // giving up and firing onclose. The same HubConnection object keeps retrying underneath --
+    // onreconnecting/onreconnected fire on it, not a fresh connection -- so connectionRef.current
+    // stays valid throughout. invoke() itself throws while the connection isn't in the
+    // Connected state, which is exactly why card interactions are gated on status === 'connected'
+    // below rather than relying on invoke() to fail safely on its own.
     const connection: HubConnection = new HubConnectionBuilder()
       .withUrl(`${API_URL}/hubs/board?access_token=${encodeURIComponent(token)}`)
+      .withAutomaticReconnect()
       .build();
 
     let cancelled = false;
@@ -303,6 +310,30 @@ export function useBoardConnection(): BoardConnectionState {
       }
     });
 
+    // Fires once the transport actually drops, after which SignalR starts retrying on its
+    // own. Presence self-heals server-side (a dropped connection triggers OnDisconnectedAsync,
+    // and the eventual reconnect triggers a fresh OnConnectedAsync with its own PresenceChanged
+    // broadcast) -- no client-side presence handling needed here.
+    connection.onreconnecting(() => {
+      if (!cancelled) {
+        setStatus('reconnecting');
+      }
+    });
+
+    // Fires once the retry actually succeeds. The board may have changed in ways no single
+    // targeted event could describe while this client was gone, so JoinBoard's fresh
+    // BoardSnapshot replaces local state wholesale rather than trying to reconcile deltas.
+    connection.onreconnected(() => {
+      if (cancelled) {
+        return;
+      }
+
+      setStatus('connected');
+      connection.invoke('JoinBoard').catch((err: unknown) => {
+        console.error('JoinBoard invoke failed', err);
+      });
+    });
+
     connection.onclose(() => {
       if (!cancelled) {
         setStatus('disconnected');
@@ -338,6 +369,13 @@ export function useBoardConnection(): BoardConnectionState {
   function createCard(columnId: string, title: string, description: string | null): void {
     setCreateCardError(null);
 
+    // Guards against more than just a disabled button: invoke() itself throws while the
+    // underlying connection isn't in the Connected state (e.g. mid-reconnect), so this check
+    // has to be here too, not just on the UI controls that call these functions.
+    if (status !== 'connected') {
+      return;
+    }
+
     const connection = connectionRef.current;
     if (!connection) {
       return;
@@ -358,6 +396,10 @@ export function useBoardConnection(): BoardConnectionState {
     afterCardId: string | null,
     beforeCardId: string | null,
   ): void {
+    if (status !== 'connected') {
+      return;
+    }
+
     const connection = connectionRef.current;
     if (!connection) {
       return;
@@ -413,6 +455,10 @@ export function useBoardConnection(): BoardConnectionState {
   }
 
   function deleteCard(cardId: string): void {
+    if (status !== 'connected') {
+      return;
+    }
+
     const connection = connectionRef.current;
     if (!connection) {
       return;

@@ -10,9 +10,10 @@ interface ColumnProps {
   createCard: (columnId: string, title: string, description: string | null) => void;
   createCardError: CreateCardRejectedEvent | null;
   deleteCard: (cardId: string) => void;
+  disabled: boolean;
 }
 
-export function Column({ column, createCard, createCardError, deleteCard }: ColumnProps) {
+export function Column({ column, createCard, createCardError, deleteCard, disabled }: ColumnProps) {
   const cardIds = column.cards.map((card) => card.id);
 
   // A droppable placeholder rendered at the bottom of every column's card
@@ -30,7 +31,13 @@ export function Column({ column, createCard, createCardError, deleteCard }: Colu
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
         <div>
           {column.cards.map((card) => (
-            <Card key={card.id} card={card} columnId={column.id} deleteCard={deleteCard} />
+            <Card
+              key={card.id}
+              card={card}
+              columnId={column.id}
+              deleteCard={deleteCard}
+              disabled={disabled}
+            />
           ))}
           <div
             ref={setDropzoneRef}
@@ -39,7 +46,12 @@ export function Column({ column, createCard, createCardError, deleteCard }: Colu
           />
         </div>
       </SortableContext>
-      <CreateCardForm column={column} createCard={createCard} createCardError={createCardError} />
+      <CreateCardForm
+        column={column}
+        createCard={createCard}
+        createCardError={createCardError}
+        disabled={disabled}
+      />
     </section>
   );
 }
