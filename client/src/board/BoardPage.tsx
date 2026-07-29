@@ -19,7 +19,7 @@ export function BoardPage() {
     createCard,
     createCardError,
     moveCard,
-    staleVersionNotice,
+    moveRejectedNotice,
     deleteCard,
   } = useBoardConnection();
   const sensors = useSensors(useSensor(PointerSensor));
@@ -84,7 +84,7 @@ export function BoardPage() {
       <p>Connection: {status}</p>
       <PresenceRoster users={presence} />
 
-      {staleVersionNotice && <p role="status">{staleVersionNotice}</p>}
+      {moveRejectedNotice && <p role="status">{moveRejectedNotice}</p>}
 
       {error && <p>Could not load the board: {error}</p>}
       {!error && !board && <p>Loading...</p>}

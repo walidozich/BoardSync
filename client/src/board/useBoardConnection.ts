@@ -34,7 +34,7 @@ export interface CardMovedEvent {
 }
 
 export interface MoveRejectedEvent {
-  reason: 'CardNotFound' | 'ColumnNotFound' | 'StaleVersion';
+  reason: 'CardNotFound' | 'ColumnNotFound' | 'StaleVersion' | 'CardDeleted';
   cardId: string;
   card: CardMovedEvent | null;
   winnerDisplayName: string | null;
@@ -53,7 +53,7 @@ export interface BoardConnectionState {
     afterCardId: string | null,
     beforeCardId: string | null,
   ) => void;
-  staleVersionNotice: string | null;
+  moveRejectedNotice: string | null;
   deleteCard: (cardId: string) => void;
 }
 
@@ -145,12 +145,16 @@ export function applyCardMoved(board: BoardDto | null, event: CardMovedEvent): B
 
 /**
  * Reducer for a `MoveRejected` event's effect on board state. Pure, so the
- * "StaleVersion restores the authoritative position" behavior is testable
- * without mocking HubConnection, matching applyCardCreated/applyCardMoved.
- * Only StaleVersion carries a payload worth applying: CardNotFound and
- * ColumnNotFound have no authoritative card to snap to (the hook falls back
- * to re-fetching a fresh snapshot for those instead, which is a side effect,
- * not board-reducer logic, so it isn't part of this function).
+ * "StaleVersion restores the authoritative position" and "CardDeleted removes
+ * the card" behaviors are testable without mocking HubConnection, matching
+ * applyCardCreated/applyCardMoved/applyCardDeleted. Two outcomes, not one
+ * generic "revert": StaleVersion has a real position to snap to (someone else
+ * moved it first); CardDeleted does not (someone else deleted it mid-drag) --
+ * repositioning a card whose row no longer exists is exactly the bug this
+ * distinction exists to avoid. CardNotFound/ColumnNotFound have no
+ * authoritative payload either way (the hook falls back to re-fetching a
+ * fresh snapshot for those instead, which is a side effect, not board-reducer
+ * logic, so it isn't part of this function).
  */
 export function applyMoveRejected(
   board: BoardDto | null,
@@ -158,6 +162,10 @@ export function applyMoveRejected(
 ): BoardDto | null {
   if (event.reason === 'StaleVersion' && event.card) {
     return applyCardMoved(board, event.card);
+  }
+
+  if (event.reason === 'CardDeleted') {
+    return applyCardDeleted(board, event.cardId);
   }
 
   return board;
@@ -198,20 +206,20 @@ export function useBoardConnection(): BoardConnectionState {
   const [status, setStatus] = useState<BoardConnectionStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [createCardError, setCreateCardError] = useState<CreateCardRejectedEvent | null>(null);
-  const [staleVersionNotice, setStaleVersionNotice] = useState<string | null>(null);
+  const [moveRejectedNotice, setMoveRejectedNotice] = useState<string | null>(null);
   const connectionRef = useRef<HubConnection | null>(null);
 
   // Auto-dismiss: a genuine timer side effect (not state derived from props), so this is
   // exactly the case useEffect is for, unlike the "adjust state during render" pattern used
   // elsewhere in this codebase for prop-driven state.
   useEffect(() => {
-    if (!staleVersionNotice) {
+    if (!moveRejectedNotice) {
       return;
     }
 
-    const timeoutId = setTimeout(() => setStaleVersionNotice(null), 4000);
+    const timeoutId = setTimeout(() => setMoveRejectedNotice(null), 4000);
     return () => clearTimeout(timeoutId);
-  }, [staleVersionNotice]);
+  }, [moveRejectedNotice]);
 
   useEffect(() => {
     if (!token) {
@@ -266,7 +274,16 @@ export function useBoardConnection(): BoardConnectionState {
         // true position exactly like any other move (dnd-kit's own sortable
         // transition handles the animation, driven by the reordered list).
         setBoard((prev) => applyMoveRejected(prev, event));
-        setStaleVersionNotice(`${event.winnerDisplayName ?? 'Someone'} moved this card first.`);
+        setMoveRejectedNotice(`${event.winnerDisplayName ?? 'Someone'} moved this card first.`);
+        return;
+      }
+
+      if (event.reason === 'CardDeleted') {
+        // Someone else deleted this card while it was being dragged. There's
+        // no authoritative position to snap to -- the row is gone -- so the
+        // only correct response is removing it, not repositioning it.
+        setBoard((prev) => applyMoveRejected(prev, event));
+        setMoveRejectedNotice('That card was deleted.');
         return;
       }
 
@@ -429,7 +446,7 @@ export function useBoardConnection(): BoardConnectionState {
       createCard: () => {},
       createCardError: null,
       moveCard: () => {},
-      staleVersionNotice: null,
+      moveRejectedNotice: null,
       deleteCard: () => {},
     };
   }
@@ -442,7 +459,7 @@ export function useBoardConnection(): BoardConnectionState {
     createCard,
     createCardError,
     moveCard,
-    staleVersionNotice,
+    moveRejectedNotice,
     deleteCard,
   };
 }

@@ -33,7 +33,7 @@ describe('App protected route', () => {
       createCard: vi.fn(),
       createCardError: null,
       moveCard: vi.fn(),
-      staleVersionNotice: null,
+      moveRejectedNotice: null,
       deleteCard: vi.fn(),
       board: {
         id: '1',

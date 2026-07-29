@@ -300,6 +300,22 @@ describe('applyMoveRejected', () => {
     expect(result!.columns[0].cards.map((c) => c.id)).toEqual(['card-c', 'card-a', 'card-b']);
   });
 
+  it('CardDeleted removes the card rather than repositioning it', () => {
+    const board = makeThreeCardBoard();
+
+    const result = applyMoveRejected(
+      board,
+      makeRejectedEvent({
+        reason: 'CardDeleted',
+        cardId: 'card-b',
+        card: null,
+        winnerDisplayName: null,
+      }),
+    );
+
+    expect(result!.columns[0].cards.map((c) => c.id)).toEqual(['card-a', 'card-c']);
+  });
+
   it('returns the same board reference for CardNotFound (no authoritative card to apply)', () => {
     const board = makeThreeCardBoard();
 

@@ -42,6 +42,16 @@ public abstract record MoveCardResult
     /// snap to the truth and say who got there first.
     /// </summary>
     public sealed record StaleVersion(Card AuthoritativeCard, string WinnerDisplayName) : MoveCardResult;
+
+    /// <summary>
+    /// Three outcomes, not two (see spec.md): a DbUpdateConcurrencyException means "zero rows
+    /// matched," which is ambiguous between "someone else moved it first" (StaleVersion, row
+    /// still exists) and "someone else deleted it mid-drag" (this case, re-query returns
+    /// null). Conflating them is how the loser of a delete race watches a card resurrect
+    /// itself -- the client's response has to differ: snap to a position for StaleVersion,
+    /// remove the card entirely for this.
+    /// </summary>
+    public sealed record CardDeleted : MoveCardResult;
 }
 
 public abstract record DeleteCardResult
@@ -66,6 +76,7 @@ public enum RejectReason
     BoardFull,
     CardNotFound,
     StaleVersion,
+    CardDeleted,
 }
 
 /// <summary>
@@ -246,16 +257,16 @@ public sealed class CardService(AppDbContext db, IConfiguration configuration)
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Zero rows matched. Re-query for the row's real current state: with no
-            // DeleteCard yet, nothing in this codebase can make that row disappear, so a
-            // null result here is a genuine invariant violation, not a case to route
-            // around silently -- fail loudly rather than let a future bug through quietly.
-            var authoritative =
-                await db.Cards.AsNoTracking().FirstOrDefaultAsync(c => c.Id == cardId)
-                ?? throw new InvalidOperationException(
-                    $"Card {cardId} vanished during a concurrency conflict, but nothing in "
-                        + "this codebase can delete a card yet. This should be unreachable."
-                );
+            // Zero rows matched -- ambiguous between "someone else moved it first" and
+            // "someone else deleted it mid-drag." Re-query to tell them apart: row still
+            // there means StaleVersion, row gone means CardDeleted. Conflating these is
+            // exactly how the loser of a delete race would watch a card resurrect itself,
+            // since a StaleVersion snap-back tries to reposition a row that no longer exists.
+            var authoritative = await db.Cards.AsNoTracking().FirstOrDefaultAsync(c => c.Id == cardId);
+            if (authoritative is null)
+            {
+                return new MoveCardResult.CardDeleted();
+            }
 
             return new MoveCardResult.StaleVersion(authoritative, authoritative.LastModifiedBy ?? "another user");
         }

@@ -162,6 +162,14 @@ public sealed class BoardHub(AppDbContext db, PresenceTracker presence, CardServ
                     )
                 );
                 break;
+            case MoveCardResult.CardDeleted:
+                // Caller only, same reasoning as StaleVersion: whoever deleted the card
+                // already got their own CardDeleted broadcast to the group when they did it.
+                await Clients.Caller.SendAsync(
+                    "MoveRejected",
+                    new MoveRejectedDto(nameof(RejectReason.CardDeleted), request.CardId, Card: null, WinnerDisplayName: null)
+                );
+                break;
         }
     }
 
