@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from './auth-context';
 import { ApiError } from '../api/client';
+import styles from './LoginPage.module.css';
 
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_DISPLAY_NAME_LENGTH = 50;
@@ -64,73 +65,93 @@ export function LoginPage() {
   }
 
   return (
-    <main>
-      <h1>BoardSync</h1>
-      <div role="tablist" aria-label="Auth mode">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'login'}
-          disabled={mode === 'login'}
-          onClick={() => setMode('login')}
-        >
-          Log in
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'register'}
-          disabled={mode === 'register'}
-          onClick={() => setMode('register')}
-        >
-          Register
-        </button>
+    <main className={styles.page}>
+      <div className={styles.card}>
+        <h1 className={styles.title}>BoardSync</h1>
+        <div role="tablist" aria-label="Auth mode" className={styles.tabs}>
+          <button
+            type="button"
+            role="tab"
+            className={styles.tab}
+            aria-selected={mode === 'login'}
+            disabled={mode === 'login'}
+            onClick={() => setMode('login')}
+          >
+            Log in
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={styles.tab}
+            aria-selected={mode === 'register'}
+            disabled={mode === 'register'}
+            onClick={() => setMode('register')}
+          >
+            Register
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} noValidate className={styles.form}>
+          <label className={styles.field}>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
+          </label>
+          {fieldErrors.email && (
+            <p role="alert" className={styles.error}>
+              {fieldErrors.email}
+            </p>
+          )}
+
+          <label className={styles.field}>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            />
+          </label>
+          {fieldErrors.password && (
+            <p role="alert" className={styles.error}>
+              {fieldErrors.password}
+            </p>
+          )}
+
+          {mode === 'register' && (
+            <>
+              <label className={styles.field}>
+                Display name
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  autoComplete="nickname"
+                />
+              </label>
+              {fieldErrors.displayName && (
+                <p role="alert" className={styles.error}>
+                  {fieldErrors.displayName}
+                </p>
+              )}
+            </>
+          )}
+
+          {formError && (
+            <p role="alert" className={styles.error}>
+              {formError}
+            </p>
+          )}
+
+          <button type="submit" className={styles.submit} disabled={submitting}>
+            {mode === 'login' ? 'Log in' : 'Register'}
+          </button>
+        </form>
       </div>
-
-      <form onSubmit={handleSubmit} noValidate>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
-        </label>
-        {fieldErrors.email && <p role="alert">{fieldErrors.email}</p>}
-
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          />
-        </label>
-        {fieldErrors.password && <p role="alert">{fieldErrors.password}</p>}
-
-        {mode === 'register' && (
-          <>
-            <label>
-              Display name
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                autoComplete="nickname"
-              />
-            </label>
-            {fieldErrors.displayName && <p role="alert">{fieldErrors.displayName}</p>}
-          </>
-        )}
-
-        {formError && <p role="alert">{formError}</p>}
-
-        <button type="submit" disabled={submitting}>
-          {mode === 'login' ? 'Log in' : 'Register'}
-        </button>
-      </form>
     </main>
   );
 }

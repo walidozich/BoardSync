@@ -1,9 +1,11 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { BoardColumnDto } from '../api/board';
+import { colorFromString } from '../lib/colorFromString';
 import { Card } from './Card';
 import { CreateCardForm } from './CreateCardForm';
 import type { CreateCardRejectedEvent } from './useBoardConnection';
+import styles from './Column.module.css';
 
 interface ColumnProps {
   column: BoardColumnDto;
@@ -26,10 +28,14 @@ export function Column({ column, createCard, createCardError, deleteCard, disabl
   });
 
   return (
-    <section>
-      <h2>{column.name}</h2>
+    <section className={styles.column}>
+      <div className={styles.header}>
+        <span className={styles.dot} style={{ backgroundColor: colorFromString(column.name) }} />
+        <h2 className={styles.name}>{column.name}</h2>
+        <span className={styles.count}>{column.cards.length}</span>
+      </div>
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-        <div>
+        <div className={styles.cards}>
           {column.cards.map((card) => (
             <Card
               key={card.id}
@@ -42,7 +48,7 @@ export function Column({ column, createCard, createCardError, deleteCard, disabl
           <div
             ref={setDropzoneRef}
             data-testid={`column-dropzone-${column.id}`}
-            style={{ minHeight: 24 }}
+            className={styles.dropzone}
           />
         </div>
       </SortableContext>

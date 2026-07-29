@@ -157,6 +157,7 @@ The client sends the drop as neighbour ids rather than a computed number, and th
 | Client | React 19 + TypeScript, Vite |
 | Drag and drop | `@dnd-kit/core`, `@dnd-kit/sortable` |
 | Real-time client | `@microsoft/signalr` |
+| UI | Plain CSS Modules with a shared token file, `lucide-react` icons (Notion-style, no component-library dependency) |
 | Tests | xUnit + Testcontainers, Vitest, Playwright |
 
 ---

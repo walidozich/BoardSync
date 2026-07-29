@@ -1,8 +1,10 @@
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { useAuth } from '../auth/auth-context';
+import { Avatar } from './Avatar';
 import { Column } from './Column';
 import { PresenceRoster } from './PresenceRoster';
 import { useBoardConnection } from './useBoardConnection';
+import styles from './BoardPage.module.css';
 
 interface DropTargetData {
   type: 'card' | 'column';
@@ -74,26 +76,45 @@ export function BoardPage() {
   }
 
   return (
-    <main>
-      <header>
-        <span>{displayName}</span>
-        <button type="button" onClick={logout}>
+    <main className={styles.page}>
+      <header className={styles.topbar}>
+        <span className={styles.wordmark}>
+          <span className={styles.wordmarkDot} aria-hidden="true" />
+          BoardSync
+        </span>
+        <PresenceRoster users={presence} />
+        <span className={styles.spacer} />
+        <span className={styles.you}>
+          <Avatar name={displayName ?? ''} size={22} />
+          {displayName}
+        </span>
+        <span className={styles.divider} aria-hidden="true" />
+        <button type="button" className={styles.logout} onClick={logout}>
           Log out
         </button>
       </header>
 
-      <p>Connection: {status}</p>
-      <PresenceRoster users={presence} />
+      {moveRejectedNotice && (
+        <p role="status" className={styles.toast}>
+          {moveRejectedNotice}
+        </p>
+      )}
 
-      {moveRejectedNotice && <p role="status">{moveRejectedNotice}</p>}
-
-      {error && <p>Could not load the board: {error}</p>}
-      {!error && !board && <p>Loading...</p>}
+      {error && (
+        <p className={`${styles.centerNote} ${styles.error}`}>Could not load the board: {error}</p>
+      )}
+      {!error && !board && <p className={styles.centerNote}>Loading...</p>}
       {board && (
         <>
-          <h1>{board.name}</h1>
+          <div className={styles.header}>
+            <h1 className={styles.title}>{board.name}</h1>
+            <span className={styles.status} data-status={status}>
+              <span className={styles.statusDot} aria-hidden="true" />
+              Connection: {status}
+            </span>
+          </div>
           <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-            <div style={{ display: 'flex', flexDirection: 'row' }}>
+            <div className={styles.board}>
               {board.columns.map((column) => (
                 <Column
                   key={column.id}

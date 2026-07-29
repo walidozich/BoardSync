@@ -1,0 +1,102 @@
+.addTrigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  margin-top: 2px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink-muted);
+  text-align: left;
+  transition: background 120ms ease;
+}
+
+.addTrigger:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.addTrigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  margin-top: 2px;
+  background: var(--canvas);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.field input,
+.field textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  background: var(--canvas);
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 56px;
+}
+
+.error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.submit {
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancel {
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.cancel:hover:not(:disabled) {
+  background: var(--surface-hover);
+}

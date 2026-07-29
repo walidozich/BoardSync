@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import type { BoardColumnDto } from '../api/board';
 import type { CreateCardRejectedEvent } from './useBoardConnection';
+import styles from './CreateCardForm.module.css';
 
 const MAX_TITLE_LENGTH = 200;
 const MAX_DESCRIPTION_LENGTH = 2000;
@@ -120,34 +121,63 @@ export function CreateCardForm({
 
   if (!expanded) {
     return (
-      <button type="button" disabled={disabled} onClick={() => setExpanded(true)}>
+      <button
+        type="button"
+        className={styles.addTrigger}
+        disabled={disabled}
+        onClick={() => setExpanded(true)}
+      >
         + Add card
       </button>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label={`Add card to ${column.name}`}>
-      <label>
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      aria-label={`Add card to ${column.name}`}
+      className={styles.form}
+    >
+      <label className={styles.field}>
         Title
         <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
       </label>
-      {fieldErrors.title && <p role="alert">{fieldErrors.title}</p>}
+      {fieldErrors.title && (
+        <p role="alert" className={styles.error}>
+          {fieldErrors.title}
+        </p>
+      )}
 
-      <label>
+      <label className={styles.field}>
         Description
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
       </label>
-      {fieldErrors.description && <p role="alert">{fieldErrors.description}</p>}
+      {fieldErrors.description && (
+        <p role="alert" className={styles.error}>
+          {fieldErrors.description}
+        </p>
+      )}
 
-      {formError && <p role="alert">{formError}</p>}
+      {formError && (
+        <p role="alert" className={styles.error}>
+          {formError}
+        </p>
+      )}
 
-      <button type="submit" disabled={submitting || disabled}>
-        {submitting ? 'Adding…' : 'Add card'}
-      </button>
-      <button type="button" onClick={handleCancel} disabled={submitting}>
-        Cancel
-      </button>
+      <div className={styles.actions}>
+        <button type="submit" className={styles.submit} disabled={submitting || disabled}>
+          {submitting ? 'Adding…' : 'Add card'}
+        </button>
+        <button
+          type="button"
+          className={styles.cancel}
+          onClick={handleCancel}
+          disabled={submitting}
+        >
+          Cancel
+        </button>
+      </div>
     </form>
   );
 }
